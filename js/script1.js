@@ -36,6 +36,7 @@ function validateLogin(event) {
         passwordError.classList.add('hidden');
     }
 
+
     if (isValid) {
         alert('Login successful!');
     }
@@ -139,6 +140,144 @@ document.addEventListener("DOMContentLoaded", function () {
         console.log("✅ Elemento encontrado correctamente:", successMessage);
     }
 });
+
+// Función para validar el inicio de sesión con conexión al backend
+async function validateLogin(event) {
+    event.preventDefault(); // Evita el envío del formulario
+
+    const email = document.getElementById('loginEmail').value;
+    const password = document.getElementById('loginPassword').value;
+
+    const emailError = document.getElementById('loginEmailError');
+    const passwordError = document.getElementById('loginPasswordError');
+
+    let isValid = true;
+
+    if (!email || !email.includes('@')) {
+        emailError.classList.remove('hidden');
+        isValid = false;
+    } else {
+        emailError.classList.add('hidden');
+    }
+
+    if (!password) {
+        passwordError.classList.remove('hidden');
+        isValid = false;
+    } else {
+        passwordError.classList.add('hidden');
+    }
+
+    if (isValid) {
+        try {
+            const response = await fetch('http://localhost:3000/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                alert('✅ Login successful!');
+                window.location.href = "/dashboard.html"; // Redirigir al usuario
+            } else {
+                alert('❌ Invalid credentials!');
+            }
+        } catch (error) {
+            console.error('Error during login:', error);
+            alert('❌ Server error! Try again later.');
+        }
+    }
+}
+
+// Función para validar el formulario de registro con conexión al backend
+async function validateRegistration(event) {
+    event.preventDefault(); // Evita que la página se recargue
+
+    const fullName = document.getElementById("fullName").value.trim();
+    const phoneNumber = document.getElementById("phoneNumber").value.trim();
+    const email = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value;
+    const confirmPassword = document.getElementById("confirmPassword").value;
+
+    const nameError = document.getElementById("nameError");
+    const phoneError = document.getElementById("phoneError");
+    const registerEmailError = document.getElementById("registerEmailError");
+    const registerPasswordError = document.getElementById("registerPasswordError");
+    const confirmPasswordError = document.getElementById("confirmPasswordError");
+    const successMessage = document.getElementById("successMessage");
+
+    let isValid = true;
+
+    // Validar nombre
+    if (fullName === "") {
+        nameError.classList.remove("hidden");
+        isValid = false;
+    } else {
+        nameError.classList.add("hidden");
+    }
+
+    // Validar teléfono
+    const phoneRegex = /^\d{10,}$/;
+    if (!phoneRegex.test(phoneNumber)) {
+        phoneError.classList.remove("hidden");
+        isValid = false;
+    } else {
+        phoneError.classList.add("hidden");
+    }
+
+    // Validar email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        registerEmailError.classList.remove("hidden");
+        isValid = false;
+    } else {
+        registerEmailError.classList.add("hidden");
+    }
+
+    // Validar contraseña
+    if (password.length < 6) {
+        registerPasswordError.classList.remove("hidden");
+        isValid = false;
+    } else {
+        registerPasswordError.classList.add("hidden");
+    }
+
+    // Validar confirmación de contraseña
+    if (password !== confirmPassword) {
+        confirmPasswordError.classList.remove("hidden");
+        isValid = false;
+    } else {
+        confirmPasswordError.classList.add("hidden");
+    }
+
+    if (isValid) {
+        try {
+            const response = await fetch('http://localhost:3000/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fullName, email, phoneNumber, password })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                successMessage.classList.remove("hidden");
+                successMessage.textContent = "✅ Registro exitoso. Redirigiendo...";
+                
+                setTimeout(() => {
+                    window.location.href = "/"; // Redirigir al login después de 3 segundos
+                }, 3000);
+            } else {
+                alert('❌ Error al registrar. Inténtalo de nuevo.');
+            }
+        } catch (error) {
+            console.error('Error during registration:', error);
+            alert('❌ Server error! Try again later.');
+        }
+    }
+}
+
 
 
 
