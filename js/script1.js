@@ -91,10 +91,10 @@ function validateRegistration(event) {
     // Validar email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email.value)) {
-        registerPasswordError.classList.remove("hidden");
+        registerEmailError.classList.remove("hidden");
         isValid = false;
     } else {
-        registerPasswordError.classList.add("hidden");
+        registerEmailError.classList.add("hidden");
     }
 
     // Validar contraseña
