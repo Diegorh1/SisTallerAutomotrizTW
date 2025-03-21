@@ -1,14 +1,27 @@
-// Función para mostrar el formulario de inicio de sesión y ocultar el de registro
+// Función para mostrar el formulario de inicio de sesión y ocultar los demás
 function showLoginForm() {
-    document.getElementById("loginForm").classList.remove("hidden");
-    document.getElementById("registrationForm").classList.add("hidden");
+    document.getElementById("loginForm").classList.remove("hidden");  // Mostrar login
+    document.getElementById("registrationForm").classList.add("hidden"); // Ocultar registro
+    document.getElementById("forgotForm").classList.add("hidden");  // Ocultar recuperación (asegurar que el modal esté cerrado)
 }
 
-// Función para mostrar el formulario de registro y ocultar el de inicio de sesión
+// Función para mostrar el formulario de registro y ocultar los demás
 function showRegistrationForm() {
-    document.getElementById("loginForm").classList.add("hidden");
-    document.getElementById("registrationForm").classList.remove("hidden");
+    document.getElementById("loginForm").classList.add("hidden"); // Ocultar login
+    document.getElementById("registrationForm").classList.remove("hidden"); // Mostrar registro
+    document.getElementById("forgotForm").classList.add("hidden"); // Ocultar recuperación (asegurar que el modal esté cerrado)
 }
+
+// Función para mostrar el modal de "Olvidé mi contraseña"
+function showForgotForm() {
+    document.getElementById("forgotForm").classList.remove("hidden"); // Mostrar el modal
+}
+
+// Función para cerrar el modal de "Olvidé mi contraseña"
+function closeForgotForm() {
+    document.getElementById("forgotForm").classList.add("hidden"); // Ocultar el modal
+}
+
 
 // Función para validar el inicio de sesión
 function validateLogin(event) {
