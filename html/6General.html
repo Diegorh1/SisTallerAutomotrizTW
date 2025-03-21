@@ -92,7 +92,11 @@
                     <div>
                         <label class="block text-gray-700 font-medium mb-2">Password*</label>
                         <input type="password" id="password" class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500" required>
-                        <p class="hidden text-red-500 text-sm mt-1" id="registerpasswordError">Password must be at least 6 characters</p>
+                        <p class="hidden text-red-500 text-sm mt-1" id="registerPasswordError">
+                            Password must be at least 6 characters
+                        </p>
+                        <p id="successMessage" class="hidden" style="color: green;">✅ Registro exitoso.</p>
+                        
                     </div>
 
                     <div>
@@ -101,12 +105,16 @@
                         <p class="hidden text-red-500 text-sm mt-1" id="confirmPasswordError">Passwords do not match</p>
                     </div>
                 </div>
+                
 
-                <!-- Botón de registro -->
-                <!-- Botón de registro -->
+
+                <!-- Botón de registro -->                <!-- Botón de registro -->
                 <button id="registerSubmit" class="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition duration-300 font-medium">
                     Register
                 </button>
+                
+
+                
 
 
                 <!-- Enlace para cambiar al formulario de inicio de sesión -->
