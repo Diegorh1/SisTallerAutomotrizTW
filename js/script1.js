@@ -192,7 +192,7 @@ async function validateLogin(event) {
 
             if (data.success) {
                 alert('✅ Login successful!');
-                window.location.href = "/dashboard.html"; // Redirigir al usuario
+                window.location.href = "/html/2Dates.html"; // Redirigir al usuario
             } else {
                 alert('❌ Invalid credentials!');
             }
