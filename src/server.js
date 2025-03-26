@@ -79,5 +79,5 @@ app.post("/register", async (req, res) => {
 // Iniciar servidor
 app.listen(PORT, async () => {
     await connectDB();
-    console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
+    console.log(`Servidor corriendo en http://localhost:${PORT}`);
 });
