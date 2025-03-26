@@ -75,13 +75,14 @@ app.post("/register", async (req, res) => {
         res.status(500).json({ success: false, message: "Error en el servidor" });
     }
 });
-
+//////////////////////////////////////////////////////////////////////////////////////////////////////
 // Ruta para obtener todos los usuarios que trabajan
 // Ruta para obtener todos los usuarios que trabajan
 app.post("/working-users", async (req, res) => {
-    const { fullName, userRole, userStatus } = req.body;
+    const { fullName, email, userRole, userStatus } = req.body;
 
-    if (!fullName || !userRole || !userStatus) {
+    // Validación para asegurar que todos los campos sean proporcionados
+    if (!fullName || !email || !userRole || !userStatus) {
         return res.status(400).json({ success: false, message: "Todos los campos son obligatorios." });
     }
 
@@ -89,16 +90,37 @@ app.post("/working-users", async (req, res) => {
         const pool = await sql.connect(dbConfig);
         await pool.request()
             .input("fullName", sql.NVarChar, fullName)
+            .input("email", sql.NVarChar, email) // Aquí se añadió la entrada para 'email'
             .input("userRole", sql.NVarChar, userRole)
             .input("userStatus", sql.NVarChar, userStatus)
-            .query("INSERT INTO WorkingUsers (FullName, UserRole, UserStatus) VALUES (@fullName, @userRole, @userStatus)");
+            .query("INSERT INTO WorkingUsers (FullName, Email, UserRole, UserStatus) VALUES (@fullName, @email, @userRole, @userStatus)");
 
+        // Respuesta de éxito al cliente
         res.json({ success: true, message: "Usuario que trabaja agregado exitosamente." });
     } catch (err) {
         console.error("❌ Error al registrar usuario que trabaja:", err);
         res.status(500).json({ success: false, message: "Error al registrar usuario que trabaja." });
     }
 });
+
+    //devolver los datos de la tabla working users
+    app.get("/working-users", async (req, res) => {
+        try {
+            const pool = await sql.connect(dbConfig);
+            const result = await pool.request().query("SELECT * FROM WorkingUsers");
+            console.log("Usuarios obtenidos:", result.recordset); // Log de depuración
+            if (result.recordset.length > 0) {
+                res.json(result.recordset);
+            } else {
+                res.status(404).json({ success: false, message: "No se encontraron usuarios." });
+            }
+        } catch (err) {
+            console.error("❌ Error al obtener usuarios:", err);
+            res.status(500).json({ success: false, message: "Error en el servidor." });
+        }
+    });
+    
+
 
 
 
