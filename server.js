@@ -76,6 +76,32 @@ app.post("/register", async (req, res) => {
     }
 });
 
+// Ruta para obtener todos los usuarios que trabajan
+// Ruta para obtener todos los usuarios que trabajan
+app.post("/working-users", async (req, res) => {
+    const { fullName, userRole, userStatus } = req.body;
+
+    if (!fullName || !userRole || !userStatus) {
+        return res.status(400).json({ success: false, message: "Todos los campos son obligatorios." });
+    }
+
+    try {
+        const pool = await sql.connect(dbConfig);
+        await pool.request()
+            .input("fullName", sql.NVarChar, fullName)
+            .input("userRole", sql.NVarChar, userRole)
+            .input("userStatus", sql.NVarChar, userStatus)
+            .query("INSERT INTO WorkingUsers (FullName, UserRole, UserStatus) VALUES (@fullName, @userRole, @userStatus)");
+
+        res.json({ success: true, message: "Usuario que trabaja agregado exitosamente." });
+    } catch (err) {
+        console.error("❌ Error al registrar usuario que trabaja:", err);
+        res.status(500).json({ success: false, message: "Error al registrar usuario que trabaja." });
+    }
+});
+
+
+
 // Iniciar servidor
 app.listen(PORT, async () => {
     await connectDB();
