@@ -76,8 +76,7 @@ app.post("/register", async (req, res) => {
     }
 });
 //////////////////////////////////////////////////////////////////////////////////////////////////////
-// Ruta para obtener todos los usuarios que trabajan
-// Ruta para obtener todos los usuarios que trabajan
+// REGISTRAR TRABAJADORES
 app.post("/working-users", async (req, res) => {
     const { fullName, email, userRole, userStatus } = req.body;
 
@@ -119,6 +118,13 @@ app.post("/working-users", async (req, res) => {
             res.status(500).json({ success: false, message: "Error en el servidor." });
         }
     });
+
+
+    
+    
+    
+    
+    
     
 
 

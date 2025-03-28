@@ -160,46 +160,182 @@
   </div>
 
   <script>
-    // Función para cargar usuarios desde la base de datos
-    async function loadUsers() {
-        try {
-            const response = await fetch("http://localhost:3000/working-users");
-            if (!response.ok) {
-                throw new Error("Error al obtener los usuarios");
-            }
     
-            const users = await response.json();
-            const tbody = document.querySelector("tbody");
-            tbody.innerHTML = ""; // Limpia cualquier contenido anterior
-    
-            users.forEach((user) => {
-                const row = `<tr class="hover:bg-gray-50">
-                    <td class="px-6 py-4 flex items-center">
-                        
-                        <span class="text-gray-800">${user.FullName}</span>
-                    </td>
-                    <td class="px-6 py-4 text-gray-800">${user.Email}</td>
-                    <td class="px-6 py-4">
-                        <span class="px-2 py-1 bg-purple-100 text-purple-800 rounded-full">${user.UserRole}</span>
-                    </td>
-                    <td class="px-6 py-4">
-                        <span class="px-2 py-1 bg-green-100 text-green-800 rounded-full">${user.UserStatus}</span>
-                    </td>
-                    <td class="px-6 py-4 space-x-2">
-                        <button class="text-blue-600 hover:text-blue-800">Edit</button>
-                        <button class="text-red-600 hover:text-red-800">Delete</button>
-                    </td>
-                </tr>`;
-                tbody.innerHTML += row;
-            });
-        } catch (error) {
-            console.error("Error al cargar usuarios:", error);
-            alert("Hubo un problema al cargar los usuarios.");
-        }
+      document.addEventListener("DOMContentLoaded", loadUsers);
+  
+      // Función para cargar usuarios desde la base de datos
+      async function loadUsers() {
+          try {
+              const response = await fetch("http://localhost:3000/working-users");
+              if (!response.ok) throw new Error("Error al obtener los usuarios");
+  
+              const users = await response.json();
+              const tbody = document.querySelector("tbody");
+              tbody.innerHTML = ""; // Limpia el contenido previo
+  
+              if (users.length === 0) {
+                  tbody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-gray-600">No hay usuarios disponibles.</td></tr>`;
+                  return;
+              }
+  
+              users.forEach((user) => {
+                  const row = document.createElement("tr");
+                  row.classList.add("hover:bg-gray-50");
+                  row.setAttribute("data-id", user.Id);
+  
+                  row.innerHTML = `
+                      <td class="px-6 py-4 flex items-center">
+                          <span class="text-gray-800 user-name">${user.FullName}</span>
+                      </td>
+                      <td class="px-6 py-4 text-gray-800 user-email">${user.Email}</td>
+                      <td class="px-6 py-4">
+                          <span class="px-2 py-1 bg-purple-100 text-purple-800 rounded-full">${user.UserRole}</span>
+                      </td>
+                      <td class="px-6 py-4">
+                          <span class="px-2 py-1 bg-green-100 text-green-800 rounded-full">${user.UserStatus}</span>
+                      </td>
+                      <td class="px-6 py-4 space-x-2">
+                          <button class="text-blue-600 hover:text-blue-800" onclick="openEditModal('${user.Id}')">Editar</button>
+                          <button class="text-red-600 hover:text-red-800" onclick="deleteUser('${user.Id}')">Eliminar</button>
+                      </td>
+                  `;
+                  tbody.appendChild(row);
+      });
+    } catch (error) {
+      console.error("Error al cargar usuarios:", error);
+      alert("Hubo un problema al cargar los usuarios.");
     }
-    
-    document.addEventListener("DOMContentLoaded", loadUsers);
-    
-  </script>
+  }
+
+  function openEditModal(userId) {
+    const userRow = document.querySelector(`tr[data-id="${userId}"]`);
+    if (!userRow) {
+      alert("Usuario no encontrado.");
+      return;
+    }
+
+    // Se obtienen los valores actuales desde la fila
+    const fullName = userRow.querySelector(".user-name")?.textContent || "";
+    const userRole = userRow.querySelector(".user-role")?.textContent || "";
+    const userStatus = userRow.querySelector(".user-status")?.textContent || "";
+
+    // Se asignan los valores al modal
+    document.getElementById("editUserId").value = userId;
+    document.getElementById("editFullName").value = fullName;
+    document.getElementById("editUserRole").value = userRole;
+    document.getElementById("editUserStatus").value = userStatus;
+
+    // Se muestra el modal y se pone el foco en el campo de nombre
+    document.getElementById("editUserModal").classList.remove("hidden");
+    document.getElementById("editFullName").focus();
+  }
+
+  document.getElementById("editUserForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const userId = document.getElementById("editUserId").value;
+    const fullName = document.getElementById("editFullName").value.trim();
+    const userRole = document.getElementById("editUserRole").value;
+    const userStatus = document.getElementById("editUserStatus").value;
+
+    if (!fullName || !userRole || !userStatus) {
+      alert("Todos los campos son obligatorios.");
+      return;
+    }
+
+    try {
+      const response = await fetch(`http://localhost:3000/working-users/${userId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fullName, userRole, userStatus }),
+      });
+
+      if (response.ok) {
+        alert("Usuario actualizado exitosamente.");
+        loadUsers(); // Recargar lista
+        document.getElementById("editUserModal").classList.add("hidden");
+      } else {
+        const error = await response.json();
+        alert(`Error: ${error.message}`);
+      }
+    } catch (error) {
+      console.error("Error al editar usuario:", error);
+    }
+  });
+
+  async function deleteUser(userId) {
+    if (!confirm("¿Estás seguro de que deseas eliminar este usuario?")) return;
+
+    try {
+      const response = await fetch(`http://localhost:3000/working-users/${userId}`, { method: "DELETE" });
+      if (response.ok) {
+        alert("Usuario eliminado exitosamente.");
+        loadUsers(); // Recargar lista
+      } else {
+        const error = await response.json();
+        alert(`Error: ${error.message}`);
+      }
+    } catch (error) {
+      console.error("Error al eliminar usuario:", error);
+    }
+  }
+</script>
+
+<!-- Modal para Editar Usuario -->
+ <!-- Modal para Editar Usuario -->
+<div id="editUserModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+  <div class="bg-white rounded-lg p-8 max-w-md w-full shadow-md">
+    <div class="flex justify-between items-center mb-6">
+      <h3 class="text-2xl font-semibold text-gray-800">Editar Usuario</h3>
+      <button onclick="document.getElementById('editUserModal').classList.add('hidden')" 
+              aria-label="Cerrar modal" 
+              class="text-gray-600 hover:text-gray-800">
+        ✕
+      </button>
+    </div>
+    <form id="editUserForm" class="space-y-4">
+      <input type="hidden" id="editUserId">
+      <div>
+        <label for="editFullName" class="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
+        <input type="text" id="editFullName" name="editFullName" placeholder="Nombre" 
+               class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" required>
+      </div>
+      <div>
+        <label for="editUserRole" class="block text-sm font-medium text-gray-700 mb-1">Rol</label>
+        <select id="editUserRole" name="editUserRole" 
+                class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" required>
+          <option value="Administrador">Administrador</option>
+          <option value="Mecánico">Mecánico</option>
+        </select>
+      </div>
+      <div>
+        <label for="editUserStatus" class="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+        <select id="editUserStatus" name="editUserStatus" 
+                class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" required>
+          <option value="Activo">Activo</option>
+          <option value="Inactivo">Inactivo</option>
+        </select>
+      </div>
+      <div class="flex justify-end space-x-4 mt-6">
+        <button type="button" 
+                onclick="document.getElementById('editUserModal').classList.add('hidden')" 
+                class="px-4 py-2 border rounded-lg hover:bg-gray-100">
+          Cancelar
+        </button>
+        <button type="submit" 
+                class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 focus:outline-none">
+          Guardar
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script> document.addEventListener("DOMContentLoaded", loadUsers);
+</script>
+
+
+
 </body>
+
 </html>
