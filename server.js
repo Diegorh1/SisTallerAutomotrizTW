@@ -4,17 +4,12 @@ const sql = require("mssql");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 
-
-
 const app = express();
 const PORT = 3000;
-
 
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
-
-
 
 // Configuración de conexión a SQL Server
 const dbConfig = {
@@ -80,47 +75,8 @@ app.post("/register", async (req, res) => {
         res.status(500).json({ success: false, message: "Error en el servidor" });
     }
 });
-
-
-// Endpoint para verificar si el email existe
-app.post("/verify-email", async (req, res) => {
-    const { email } = req.body;
-    if (!email) return res.status(400).json({ message: "El email es requerido." });
-    
-    try {
-      await sql.connect(dbConfig);
-      const result = await sql.query`SELECT * FROM Users WHERE Email = ${email}`;
-      if (result.recordset.length === 0) {
-        return res.status(404).json({ message: "Usuario no encontrado." });
-      }
-      return res.status(200).json({ message: "Usuario encontrado." });
-    } catch (error) {
-      console.error("Error en /verify-email:", error);
-      res.status(500).json({ message: "Error en el servidor." });
-    }
-  });
-  //////////////////////////////////////////
-  // Endpoint para resetear la contraseña
-  app.post("/reset-password", async (req, res) => {
-    const { email, password, confirmPassword } = req.body;
-    if (!email || !password || !confirmPassword) {
-      return res.status(400).json({ message: "Todos los campos son requeridos." });
-    }
-    if (password !== confirmPassword) {
-      return res.status(400).json({ message: "Las contraseñas no coinciden." });
-    }
-  
-    try {
-      await sql.connect(dbConfig);
-      // Nota: En producción, aplica un hash (por ejemplo, bcrypt) al password.
-      await sql.query`UPDATE Users SET Password = ${password} WHERE Email = ${email}`;
-      return res.status(200).json({ message: "Contraseña actualizada con éxito." });
-    } catch (error) {
-      console.error("Error en /reset-password:", error);
-      return res.status(500).json({ message: "Error al actualizar la contraseña." });
-    }
-  });
 //////////////////////////////////////////////////////////////////////////////////////////////////////
+// Ruta para obtener todos los usuarios que trabajan
 // Ruta para obtener todos los usuarios que trabajan
 app.post("/working-users", async (req, res) => {
     const { fullName, email, userRole, userStatus } = req.body;
@@ -164,6 +120,10 @@ app.post("/working-users", async (req, res) => {
         }
     });
     
+
+
+
+
 // Iniciar servidor
 app.listen(PORT, async () => {
     await connectDB();
