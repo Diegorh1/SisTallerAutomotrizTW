@@ -120,7 +120,69 @@ app.post("/working-users", async (req, res) => {
     });
 
 
-    
+    // PUT: Actualiza FullName, Email, UserRole y UserStatus de un usuario
+app.put("/working-users/:id", async (req, res) => {
+    const userId = parseInt(req.params.id);
+    const { fullName, email, userRole, userStatus } = req.body;
+  
+    if (!userId || !fullName || !email || !userRole || !userStatus) {
+      return res.status(400).json({ success: false, message: "Datos inválidos." });
+    }
+  
+    try {
+      const pool = await sql.connect(dbConfig);
+      const result = await pool.request()
+        .input("id", sql.Int, userId)
+        .input("fullName", sql.NVarChar, fullName)
+        .input("email", sql.NVarChar, email)
+        .input("userRole", sql.NVarChar, userRole)
+        .input("userStatus", sql.NVarChar, userStatus)
+        .query("UPDATE WorkingUsers SET FullName = @fullName, Email = @email, UserRole = @userRole, UserStatus = @userStatus WHERE Id = @id");
+  
+      if (result.rowsAffected[0] === 0) {
+        return res.status(404).json({ success: false, message: "Usuario no encontrado." });
+      }
+  
+      res.json({ success: true, message: "Usuario actualizado exitosamente." });
+    } catch (err) {
+      console.error("Error al actualizar usuario:", err);
+      res.status(500).json({ success: false, message: "Error al actualizar usuario." });
+    } finally {
+      sql.close();
+    }
+  });
+  
+  // DELETE: Elimina un usuario
+  app.delete("/working-users/:id", async (req, res) => {
+    const userId = parseInt(req.params.id);
+    console.log("Intentando eliminar el usuario con ID:", userId);
+  
+    if (!userId) {
+      return res.status(400).json({ success: false, message: "ID inválido." });
+    }
+  
+    try {
+      const pool = await sql.connect(dbConfig);
+      const result = await pool.request()
+        .input("id", sql.Int, userId)
+        .query("DELETE FROM WorkingUsers WHERE Id = @id");
+      
+      console.log("Filas afectadas:", result.rowsAffected[0]);
+  
+      if (result.rowsAffected[0] === 0) {
+        return res.status(404).json({ success: false, message: "Usuario no encontrado." });
+      }
+  
+      res.json({ success: true, message: "Usuario eliminado exitosamente." });
+    } catch (err) {
+      console.error("Error al eliminar usuario:", err);
+      res.status(500).json({ success: false, message: "Error al eliminar usuario." });
+    } finally {
+      sql.close();
+    }
+  });
+  
+  
     
     
     
