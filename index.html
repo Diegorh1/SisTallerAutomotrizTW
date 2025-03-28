@@ -37,54 +37,7 @@
                 <input type="text" placeholder="Search clients..." class="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                 <select class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                     <option value="">All Brands</option>
-                    <option value="">All Brands</option>
-                    <option value="toyota">Toyota</option>
-                    <option value="honda">Honda</option>
-                    <option value="ford">Ford</option>
-                    <option value="chevrolet">Chevrolet</option>
-                    <option value="nissan">Nissan</option>
-                    <option value="bmw">BMW</option>
-                    <option value="mercedes-benz">Mercedes-Benz</option>
-                    <option value="audi">Audi</option>
-                    <option value="volkswagen">Volkswagen</option>
-                    <option value="hyundai">Hyundai</option>
-                    <option value="kia">Kia</option>
-                    <option value="mazda">Mazda</option>
-                    <option value="subaru">Subaru</option>
-                    <option value="tesla">Tesla</option>
-                    <option value="jeep">Jeep</option>
-                    <option value="ram">Ram</option>
-                    <option value="dodge">Dodge</option>
-                    <option value="gmc">GMC</option>
-                    <option value="cadillac">Cadillac</option>
-                    <option value="porsche">Porsche</option>
-                    <option value="jaguar">Jaguar</option>
-                    <option value="land-rover">Land Rover</option>
-                    <option value="volvo">Volvo</option>
-                    <option value="mitsubishi">Mitsubishi</option>
-                    <option value="fiat">Fiat</option>
-                    <option value="peugeot">Peugeot</option>
-                    <option value="renault">Renault</option>
-                    <option value="lincoln">Lincoln</option>
-                    <option value="acura">Acura</option>
-                    <option value="infiniti">Infiniti</option>
-                    <option value="alfa-romeo">Alfa Romeo</option>
-                    <option value="mini">Mini</option>
-                    <option value="buick">Buick</option>
-                    <option value="chrysler">Chrysler</option>
-                    <option value="citroen">Citroën</option>
-                    <option value="ferrari">Ferrari</option>
-                    <option value="lamborghini">Lamborghini</option>
-                    <option value="maserati">Maserati</option>
-                    <option value="bentley">Bentley</option>
-                    <option value="rolls-royce">Rolls-Royce</option>
-                    <option value="aston-martin">Aston Martin</option>
-                    <option value="bugatti">Bugatti</option>
-                    <option value="lotus">Lotus</option>
-                    <option value="mcLaren">McLaren</option>
-                    <option value="opel">Opel</option>
-                    <option value="skoda">Škoda</option>
-                    <option value="seat">SEAT</option>
+                    
                     
 
                 </select>
@@ -143,53 +96,7 @@
                         <label class="block text-sm font-medium text-gray-700 mb-1">Vehicle Brand</label>
                         <select class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
                             <option value="">All Brands</option>
-                            <option value="toyota">Toyota</option>
-                            <option value="honda">Honda</option>
-                            <option value="ford">Ford</option>
-                            <option value="chevrolet">Chevrolet</option>
-                            <option value="nissan">Nissan</option>
-                            <option value="bmw">BMW</option>
-                            <option value="mercedes-benz">Mercedes-Benz</option>
-                            <option value="audi">Audi</option>
-                            <option value="volkswagen">Volkswagen</option>
-                            <option value="hyundai">Hyundai</option>
-                            <option value="kia">Kia</option>
-                            <option value="mazda">Mazda</option>
-                            <option value="subaru">Subaru</option>
-                            <option value="tesla">Tesla</option>
-                            <option value="jeep">Jeep</option>
-                            <option value="ram">Ram</option>
-                            <option value="dodge">Dodge</option>
-                            <option value="gmc">GMC</option>
-                            <option value="cadillac">Cadillac</option>
-                            <option value="porsche">Porsche</option>
-                            <option value="jaguar">Jaguar</option>
-                            <option value="land-rover">Land Rover</option>
-                            <option value="volvo">Volvo</option>
-                            <option value="mitsubishi">Mitsubishi</option>
-                            <option value="fiat">Fiat</option>
-                            <option value="peugeot">Peugeot</option>
-                            <option value="renault">Renault</option>
-                            <option value="lincoln">Lincoln</option>
-                            <option value="acura">Acura</option>
-                            <option value="infiniti">Infiniti</option>
-                            <option value="alfa-romeo">Alfa Romeo</option>
-                            <option value="mini">Mini</option>
-                            <option value="buick">Buick</option>
-                            <option value="chrysler">Chrysler</option>
-                            <option value="citroen">Citroën</option>
-                            <option value="ferrari">Ferrari</option>
-                            <option value="lamborghini">Lamborghini</option>
-                            <option value="maserati">Maserati</option>
-                            <option value="bentley">Bentley</option>
-                            <option value="rolls-royce">Rolls-Royce</option>
-                            <option value="aston-martin">Aston Martin</option>
-                            <option value="bugatti">Bugatti</option>
-                            <option value="lotus">Lotus</option>
-                            <option value="mcLaren">McLaren</option>
-                            <option value="opel">Opel</option>
-                            <option value="skoda">Škoda</option>
-                            <option value="seat">SEAT</option>
+                            
 
                         </select>
                     </div>
@@ -211,5 +118,54 @@
             <p>&copy; 2025 AutoCare Rodriguez. All rights reserved.</p>
         </div>
     </footer>
+    <script> 
+        document.addEventListener('DOMContentLoaded', () => {
+            fetch('/clients') // Llamada al backend para obtener los clientes
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Error HTTP! Status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    const tableBody = document.querySelector('tbody');
+                    tableBody.innerHTML = ''; // Limpia la tabla antes de llenarla
+                    data.forEach(client => {
+                        const row = `
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4">${client.name}</td>
+                                <td class="px-6 py-4">${client.vehicle}</td>
+                                <td class="px-6 py-4">${client.contact}</td>
+                                <td class="px-6 py-4">
+                                    <button class="text-blue-600 hover:text-blue-800 mr-3" onclick="editClient(${client.id})">Edit</button>
+                                    <button class="text-red-600 hover:text-red-800" onclick="deleteClient(${client.id})">Delete</button>
+                                </td>
+                            </tr>
+                        `;
+                        tableBody.insertAdjacentHTML('beforeend', row);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error al obtener clientes:', error);
+                });
+        });
+        
+        function editClient(id) {
+            // Lógica para editar un cliente
+            console.log(`Edit client with ID: ${id}`);
+        }
+        
+        function deleteClient(id) {
+            fetch(`/clients/${id}`, { method: 'DELETE' })
+                .then(() => {
+                    alert('Cliente eliminado');
+                    location.reload();
+                })
+                .catch(error => {
+                    console.error('Error al eliminar cliente:', error);
+                });
+        }
+        
+    </script>
 </body>
 </html>

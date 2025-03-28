@@ -4,12 +4,13 @@ const sql = require("mssql");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 
-const app = express();
+const app = express(); // Aquí definimos "app" correctamente
 const PORT = 3000;
 
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
+app.use(express.json());
 
 // Configuración de conexión a SQL Server
 const dbConfig = {
@@ -181,6 +182,53 @@ app.put("/working-users/:id", async (req, res) => {
       sql.close();
     }
   });
+
+  // Mostrar clientes
+  app.get('/clients', async (req, res) => {
+    try {
+        const result = await sql.query('SELECT * FROM Clients'); // Ensure Clients table exists
+        res.json(result.recordset);
+    } catch (error) {
+        console.error(error);
+        res.status(500).send('Server error occurred');
+    }
+});
+
+// Eliminar cliente
+app.delete('/clients/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+      await sql.query(`DELETE FROM Clients WHERE id = ${id}`); // Ajusta el nombre de tu columna
+      res.sendStatus(200);
+  } catch (error) {
+      console.error(error);
+      res.status(500).send('Error deleting client');
+  }
+});
+
+////////////////////////////////////////////////////////////////////////
+// Endpoint para obtener clientes
+app.get('/clients', async (req, res) => {
+  try {
+      const result = await sql.query('SELECT * FROM Clients'); // Asegúrate de que la tabla Clients existe
+      res.json(result.recordset);
+  } catch (error) {
+      console.error(error);
+      res.status(500).send('Error al obtener los clientes');
+  }
+});
+
+// Endpoint para eliminar un cliente
+app.delete('/clients/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+      await sql.query(`DELETE FROM Clients WHERE id = ${id}`); // Ajusta el nombre de la columna ID
+      res.sendStatus(200);
+  } catch (error) {
+      console.error(error);
+      res.status(500).send('Error al eliminar el cliente');
+  }
+});
   
   
     
@@ -195,5 +243,5 @@ app.put("/working-users/:id", async (req, res) => {
 // Iniciar servidor
 app.listen(PORT, async () => {
     await connectDB();
-    console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
+    console.log(`Servidor corriendo en http://localhost:${PORT}`);
 });
