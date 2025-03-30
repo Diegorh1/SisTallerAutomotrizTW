@@ -34,7 +34,9 @@ async function connectDB() {
         console.error("❌ Error de conexión a SQL Server:", err);
     }
 }
-
+//////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////
 // Ruta para manejar el inicio de sesión
 app.post("/login", async (req, res) => {
     const { email, password } = req.body;
@@ -57,7 +59,7 @@ app.post("/login", async (req, res) => {
     }
 });
 
-// Ruta para manejar el registro de usuarios
+// Ruta para manejar el registro de usuarios INICIO DE SESION
 app.post("/register", async (req, res) => {
     const { fullName, email, phoneNumber, password } = req.body;
 
@@ -77,7 +79,9 @@ app.post("/register", async (req, res) => {
     }
 });
 //////////////////////////////////////////////////////////////////////////////////////////////////////
-// REGISTRAR TRABAJADORES
+//////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////
+// REGISTRAR TRABAJADORES EN EL MODULO 2
 app.post("/working-users", async (req, res) => {
     const { fullName, email, userRole, userStatus } = req.body;
 
@@ -183,63 +187,8 @@ app.put("/working-users/:id", async (req, res) => {
     }
   });
 
-  // Mostrar clientes
-  app.get('/clients', async (req, res) => {
-    try {
-        const result = await sql.query('SELECT * FROM Clients'); // Ensure Clients table exists
-        res.json(result.recordset);
-    } catch (error) {
-        console.error(error);
-        res.status(500).send('Server error occurred');
-    }
-});
-
-// Eliminar cliente
-app.delete('/clients/:id', async (req, res) => {
-  const { id } = req.params;
-  try {
-      await sql.query(`DELETE FROM Clients WHERE id = ${id}`); // Ajusta el nombre de tu columna
-      res.sendStatus(200);
-  } catch (error) {
-      console.error(error);
-      res.status(500).send('Error deleting client');
-  }
-});
-
 ////////////////////////////////////////////////////////////////////////
 // Endpoint para obtener clientes
-app.get('/clients', async (req, res) => {
-  try {
-      const result = await sql.query('SELECT * FROM Clients'); // Asegúrate de que la tabla Clients existe
-      res.json(result.recordset);
-  } catch (error) {
-      console.error(error);
-      res.status(500).send('Error al obtener los clientes');
-  }
-});
-
-// Endpoint para eliminar un cliente
-app.delete('/clients/:id', async (req, res) => {
-  const { id } = req.params;
-  try {
-      await sql.query(`DELETE FROM Clients WHERE id = ${id}`); // Ajusta el nombre de la columna ID
-      res.sendStatus(200);
-  } catch (error) {
-      console.error(error);
-      res.status(500).send('Error al eliminar el cliente');
-  }
-});
-  
-  
-    
-    
-    
-    
-    
-
-
-
-
 // Iniciar servidor
 app.listen(PORT, async () => {
     await connectDB();
