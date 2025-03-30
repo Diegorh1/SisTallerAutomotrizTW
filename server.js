@@ -83,29 +83,55 @@ app.post("/register", async (req, res) => {
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 // REGISTRAR TRABAJADORES EN EL MODULO 2
 app.post("/working-users", async (req, res) => {
-    const { fullName, email, userRole, userStatus } = req.body;
+  const { fullName, email, password, userRole, userStatus } = req.body;
 
-    // Validación para asegurar que todos los campos sean proporcionados
-    if (!fullName || !email || !userRole || !userStatus) {
-        return res.status(400).json({ success: false, message: "Todos los campos son obligatorios." });
-    }
+  // Validación para asegurar que todos los campos sean proporcionados
+  if (!fullName || !email || !password || !userRole || !userStatus) {
+      return res.status(400).json({ success: false, message: "Todos los campos son obligatorios." });
+  }
 
-    try {
-        const pool = await sql.connect(dbConfig);
-        await pool.request()
-            .input("fullName", sql.NVarChar, fullName)
-            .input("email", sql.NVarChar, email) // Aquí se añadió la entrada para 'email'
-            .input("userRole", sql.NVarChar, userRole)
-            .input("userStatus", sql.NVarChar, userStatus)
-            .query("INSERT INTO WorkingUsers (FullName, Email, UserRole, UserStatus) VALUES (@fullName, @email, @userRole, @userStatus)");
+  let pool;
+  try {
+      pool = await sql.connect(dbConfig);
+      
+      // Verificar si el email ya existe
+      const checkEmail = await pool.request()
+          .input("Email", sql.NVarChar, email)
+          .query("SELECT Id FROM WorkingUsers WHERE Email = @Email");
+          
+      if (checkEmail.recordset.length > 0) {
+          return res.status(400).json({ success: false, message: "El correo electrónico ya está registrado." });
+      }
 
-        // Respuesta de éxito al cliente
-        res.json({ success: true, message: "Usuario que trabaja agregado exitosamente." });
-    } catch (err) {
-        console.error("❌ Error al registrar usuario que trabaja:", err);
-        res.status(500).json({ success: false, message: "Error al registrar usuario que trabaja." });
-    }
+      // Hashear la contraseña antes de guardarla
+      const hashedPassword = await bcrypt.hash(password, 10);
+      
+      const result = await pool.request()
+          .input("fullName", sql.NVarChar, fullName)
+          .input("email", sql.NVarChar, email)
+          .input("password", sql.NVarChar, hashedPassword)
+          .input("userRole", sql.NVarChar, userRole)
+          .input("userStatus", sql.NVarChar, userStatus)
+          .query(`
+              INSERT INTO WorkingUsers (FullName, Email, Password, UserRole, UserStatus) 
+              VALUES (@fullName, @email, @password, @userRole, @userStatus);
+              SELECT SCOPE_IDENTITY() AS Id;
+          `);
+
+      // Respuesta de éxito al cliente
+      res.json({ 
+          success: true, 
+          message: "Usuario agregado exitosamente.",
+          userId: result.recordset[0].Id
+      });
+  } catch (err) {
+      console.error("❌ Error al registrar usuario:", err);
+      res.status(500).json({ success: false, message: "Error al registrar usuario." });
+  } finally {
+      if (pool) await pool.close();
+  }
 });
+
 
     //devolver los datos de la tabla working users
     app.get("/working-users", async (req, res) => {
@@ -127,35 +153,47 @@ app.post("/working-users", async (req, res) => {
 
     // PUT: Actualiza FullName, Email, UserRole y UserStatus de un usuario
 app.put("/working-users/:id", async (req, res) => {
-    const userId = parseInt(req.params.id);
-    const { fullName, email, userRole, userStatus } = req.body;
-  
-    if (!userId || !fullName || !email || !userRole || !userStatus) {
-      return res.status(400).json({ success: false, message: "Datos inválidos." });
-    }
-  
-    try {
-      const pool = await sql.connect(dbConfig);
-      const result = await pool.request()
-        .input("id", sql.Int, userId)
-        .input("fullName", sql.NVarChar, fullName)
+  const userId = parseInt(req.params.id);
+  const { fullName, email, userRole, userStatus } = req.body;
+
+  if (!userId || !fullName || !email || !userRole || !userStatus) {
+    return res.status(400).json({ success: false, message: "Datos inválidos." });
+  }
+
+  let pool;
+  try {
+    pool = await sql.connect(dbConfig);
+    
+    // Verificar si el email ya existe para otro usuario
+    const checkEmail = await pool.request()
         .input("email", sql.NVarChar, email)
-        .input("userRole", sql.NVarChar, userRole)
-        .input("userStatus", sql.NVarChar, userStatus)
-        .query("UPDATE WorkingUsers SET FullName = @fullName, Email = @email, UserRole = @userRole, UserStatus = @userStatus WHERE Id = @id");
-  
-      if (result.rowsAffected[0] === 0) {
-        return res.status(404).json({ success: false, message: "Usuario no encontrado." });
-      }
-  
-      res.json({ success: true, message: "Usuario actualizado exitosamente." });
-    } catch (err) {
-      console.error("Error al actualizar usuario:", err);
-      res.status(500).json({ success: false, message: "Error al actualizar usuario." });
-    } finally {
-      sql.close();
+        .input("id", sql.Int, userId)
+        .query("SELECT Id FROM WorkingUsers WHERE Email = @email AND Id != @id");
+        
+    if (checkEmail.recordset.length > 0) {
+        return res.status(400).json({ success: false, message: "El correo electrónico ya está en uso por otro usuario." });
     }
-  });
+    
+    const result = await pool.request()
+      .input("id", sql.Int, userId)
+      .input("fullName", sql.NVarChar, fullName)
+      .input("email", sql.NVarChar, email)
+      .input("userRole", sql.NVarChar, userRole)
+      .input("userStatus", sql.NVarChar, userStatus)
+      .query("UPDATE WorkingUsers SET FullName = @fullName, Email = @email, UserRole = @userRole, UserStatus = @userStatus WHERE Id = @id");
+
+    if (result.rowsAffected[0] === 0) {
+      return res.status(404).json({ success: false, message: "Usuario no encontrado." });
+    }
+
+    res.json({ success: true, message: "Usuario actualizado exitosamente." });
+  } catch (err) {
+    console.error("Error al actualizar usuario:", err);
+    res.status(500).json({ success: false, message: "Error al actualizar usuario." });
+  } finally {
+    if (pool) await pool.close();
+  }
+});
   
   // DELETE: Elimina un usuario
   app.delete("/working-users/:id", async (req, res) => {

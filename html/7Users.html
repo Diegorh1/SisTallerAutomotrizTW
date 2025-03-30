@@ -122,35 +122,55 @@
                       class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 focus:outline-none">
                 Guardar
               </button>
-              <script>document.querySelector("#addUserForm").addEventListener("submit", async (event) => {
-                event.preventDefault(); // Evita que la página se recargue
-            
-                // Capturar valores del formulario
-                const fullName = document.querySelector("#fullName").value;
-                const email = document.querySelector("#email").value;
-                const userRole = document.querySelector("#userRole").value;
-                const userStatus = document.querySelector("#userStatus").value;
-            
-                try {
-                    // Enviar los datos al backend
-                    const response = await fetch("http://localhost:3000/working-users", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ fullName, email, userRole, userStatus }),
-                    });
-            
-                    if (response.ok) {
-                        alert("Usuario agregado exitosamente.");
-                        location.reload(); // Refrescar la página para actualizar los datos
-                    } else {
-                        const error = await response.json();
-                        alert(`Error: ${error.message}`);
-                    }
-                } catch (error) {
-                    console.error("Error al guardar el usuario:", error);
-                    alert("Hubo un problema al guardar el usuario.");
-                }
-            });
+              <!--PARA QUE SE REGISTRE EL USUARIO-->
+              <script>
+                document.querySelector("#addUserForm").addEventListener("submit", async (event) => {
+                  event.preventDefault(); // Evita que la página se recargue
+              
+                  // Capturar valores del formulario
+                  const fullName = document.querySelector("#fullName").value;
+                  const email = document.querySelector("#email").value;
+                  const password = document.querySelector("#password").value;
+                  const confirmPassword = document.querySelector("#confirmPassword").value;
+                  const userRole = document.querySelector("#userRole").value;
+                  const userStatus = document.querySelector("#userStatus").value;
+              
+                  // Validar que las contraseñas coincidan
+                  if (password !== confirmPassword) {
+                      alert("Las contraseñas no coinciden");
+                      return;
+                  }
+              
+                  try {
+                      // Enviar los datos al backend
+                      const response = await fetch("http://localhost:3000/working-users", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ fullName, email, password, userRole, userStatus }),
+                      });
+              
+                      const result = await response.json();
+              
+                      if (response.ok) {
+                          alert("Usuario agregado exitosamente.");
+                          document.querySelector("#addUserModal").classList.add("hidden");
+                          document.querySelector("#addUserForm").reset();
+                          // Recargar la lista de usuarios
+                          fetchUsers();
+                      } else {
+                          alert(`Error: ${result.message || "Error al crear usuario"}`);
+                      }
+                  } catch (error) {
+                      
+                  }
+                  // Cuando el usuario intenta iniciar sesión
+                  const isMatch = await bcrypt.compare(passwordIngresada, hashedPasswordDeLaBaseDeDatos);
+                  if (isMatch) {
+                      // Contraseña correcta, permitir acceso
+                  } else {
+                      // Contraseña incorrecta
+                  }
+              });
             </script>
             </div>
           </form>
@@ -179,6 +199,11 @@
         <label for="editFullName" class="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
         <input type="text" id="editFullName" name="editFullName" placeholder="Nombre" 
                class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" required>
+      </div>
+      <div>
+        <label for="editEmail" class="block text-sm font-medium text-gray-700 mb-1">Correo</label>
+        <input type="tex" id="editEmail" name="editEmail" placeholder="Correo electronico"
+              class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500" required>
       </div>
       <div>
         <label for="editUserRole" class="block text-sm font-medium text-gray-700 mb-1">Rol</label>
@@ -211,11 +236,10 @@
   </div>
 </div>
 
-<script> document.addEventListener("DOMContentLoaded", loadUsers);
-</script>
+
 
 <script>
-  document.addEventListener("DOMContentLoaded", loadUsers);
+  
 
   // Función para cargar usuarios desde el backend
   async function loadUsers() {
@@ -318,60 +342,84 @@
     }
   }
 
+  
   // Abre modal de edición y llena los campos con los datos actuales
-  function openEditModal(userId) {
-    const userRow = document.querySelector(`tr[data-id="${userId}"]`);
-    if (!userRow) {
-      alert("Usuario no encontrado.");
-      return;
-    }
-
-    const fullName = userRow.querySelector(".user-name")?.textContent || "";
-    const userRole = userRow.querySelector(".user-role")?.textContent || "";
-    const userStatus = userRow.querySelector(".user-status")?.textContent || "";
-
-    document.getElementById("editUserId").value = userId;
-    document.getElementById("editFullName").value = fullName;
-    document.getElementById("editUserRole").value = userRole;
-    document.getElementById("editUserStatus").value = userStatus;
-
-    document.getElementById("editUserModal").classList.remove("hidden");
-    document.getElementById("editFullName").focus();
+function openEditModal(userId) {
+  const userRow = document.querySelector(`tr[data-id="${userId}"]`);
+  if (!userRow) {
+    alert("Usuario no encontrado.");
+    return;
   }
 
-  // Maneja la actualización del usuario mediante PUT
-  document.getElementById("editUserForm").addEventListener("submit", async (event) => {
-    event.preventDefault();
+  const fullName = userRow.querySelector(".user-name")?.textContent || "";
+  const userRole = userRow.querySelector(".user-role")?.textContent || "";
+  const userStatus = userRow.querySelector(".user-status")?.textContent || "";
+  const email = userRow.querySelector('.user-email')?.textContent || ""; // Corregido: añadido punto antes de user-email y comillas simples
 
-    const userId = document.getElementById("editUserId").value;
-    const fullName = document.getElementById("editFullName").value.trim();
-    const userRole = document.getElementById("editUserRole").value;
-    const userStatus = document.getElementById("editUserStatus").value;
+  document.getElementById("editUserId").value = userId;
+  document.getElementById("editFullName").value = fullName;
+  document.getElementById("editEmail").value = email; // Corregido: añadido esta línea para asignar el email
+  document.getElementById("editUserRole").value = userRole;
+  document.getElementById("editUserStatus").value = userStatus;
 
-    if (!fullName || !userRole || !userStatus) {
-      alert("Todos los campos son obligatorios.");
-      return;
+  document.getElementById("editUserModal").classList.remove("hidden");
+  document.getElementById("editFullName").focus();
+}
+
+// Maneja la actualización del usuario mediante PUT
+document.getElementById("editUserForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+
+  // Obtener valores del formulario
+  const userId = document.getElementById("editUserId").value;
+  const fullName = document.getElementById("editFullName").value.trim();
+  const email = document.getElementById("editEmail").value.trim();
+  const userRole = document.getElementById("editUserRole").value;
+  const userStatus = document.getElementById("editUserStatus").value;
+
+  // Validar campos obligatorios
+  if (!fullName || !email || !userRole || !userStatus) {
+    alert("Todos los campos son obligatorios.");
+    return;
+  }
+
+  // Validar formato de email
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    alert("Por favor ingrese un correo electrónico válido.");
+    return;
+  }
+
+  // Mostrar indicador de carga
+  const submitButton = document.querySelector("#editUserForm button[type='submit']");
+  const originalButtonText = submitButton.textContent;
+  submitButton.textContent = "Guardando...";
+  submitButton.disabled = true;
+
+  try {
+    const response = await fetch(`http://localhost:3000/working-users/${userId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fullName, email, userRole, userStatus })
+    });
+
+    const result = await response.json();
+
+    if (response.ok) {
+      alert("Usuario actualizado exitosamente.");
+      document.getElementById("editUserModal").classList.add("hidden");
+      await fetchUsers(); // Esperar a que se complete la carga de usuarios
+    } else {
+      alert(`Error: ${result.message || "Error al actualizar usuario"}`);
     }
-
-    try {
-      const response = await fetch(`http://localhost:3000/working-users/${userId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fullName, userRole, userStatus })
-      });
-
-      if (response.ok) {
-        alert("Usuario actualizado exitosamente.");
-        loadUsers(); // Recargar la lista
-        document.getElementById("editUserModal").classList.add("hidden");
-      } else {
-        const error = await response.json();
-        alert(`Error: ${error.message}`);
-      }
-    } catch (error) {
-      console.error("Error al editar usuario:", error);
-    }
-  });
+  } catch (error) {
+    
+  } finally {
+    // Restaurar el botón
+    submitButton.textContent = originalButtonText;
+    submitButton.disabled = false;
+  }
+});
 
   // Función para eliminar un usuario mediante DELETE
   async function deleteUser(userId) {
@@ -393,6 +441,8 @@
       console.error("Error al eliminar usuario:", error);
     }
   }
+</script>
+<script> document.addEventListener("DOMContentLoaded", loadUsers);
 </script>
 </body>
 
