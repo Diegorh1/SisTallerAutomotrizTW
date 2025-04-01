@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - AutoCare Rodriguez</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50">
+    <nav class="bg-gray-800 text-white px-6 py-4">
+        <div class="flex items-center justify-between">
+            <h1 class="text-2xl font-bold">AutoCare Rodriguez - Admin</h1>
+            <div class="flex items-center space-x-4">
+                
+                <div class="flex space-x-4">
+                    <a href="admin-clients.html">
+                        <button class="px-4 py-2 rounded hover:bg-gray-700">Clients</button>
+                    </a>                  
+                    <a href="admin-appointments.html">
+                        <button class="px-4 py-2 rounded bg-gray-700">Appointments</button>
+                    </a>
+                    <a href="admin-services.html">
+                        <button class="px-4 py-2 rounded hover:bg-gray-700">Services</button>
+                    </a>
+                    <a href="admin-inventory.html">
+                        <button class="px-4 py-2 rounded hover:bg-gray-700">Inventory</button>
+                    </a>
+                    <a href="admin-billing.html">
+                        <button class="px-4 py-2 rounded hover:bg-gray-700">Billing</button>
+                    </a>
+                    <a href="admin-users.html">
+                        <button class="px-4 py-2 rounded hover:bg-gray-700">Users</button>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto px-4 py-8">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-3xl font-semibold text-gray-800">Appointments Management</h2>
+            <button class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors" onclick="document.getElementById('adminScheduleModal').classList.remove('hidden')">Add New Appointment</button>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex flex-col md:flex-row gap-4 mb-6">
+                <input type="date" class="flex-1 px-4 py-2 border rounded-lg">
+                <input type="text" placeholder="Search Client" class="flex-1 px-4 py-2 border rounded-lg">
+                <select class="px-4 py-2 border rounded-lg">
+                    <option value="">All Status</option>
+                    <option value="pending">Pending</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
+                </select>
+                <button class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Filter</button>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date & Time</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Client</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vehicle</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Service</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4">2024-02-20 10:00 AM</td>
+                            <td class="px-6 py-4">John Doe</td>
+                            <td class="px-6 py-4">Toyota Camry 2020</td>
+                            <td class="px-6 py-4">Oil Change</td>
+                            <td class="px-6 py-4">
+                                <select class="px-2 py-1 border rounded text-sm">
+                                    <option value="pending">Pending</option>
+                                    <option value="in_progress">In Progress</option>
+                                    <option value="completed">Completed</option>
+                                    <option value="cancelled">Cancelled</option>
+                                </select>
+                            </td>
+                            <td class="px-6 py-4">
+                                <button class="text-blue-600 hover:text-blue-800 mr-3">Edit</button>
+                                <button class="text-red-600 hover:text-red-800">Delete</button>
+                            </td>
+                        </tr>
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4">2024-02-20 1:30 PM</td>
+                            <td class="px-6 py-4">Maria Garcia</td>
+                            <td class="px-6 py-4">Honda Civic 2019</td>
+                            <td class="px-6 py-4">Brake Service</td>
+                            <td class="px-6 py-4">
+                                <select class="px-2 py-1 border rounded text-sm">
+                                    <option value="pending">Pending</option>
+                                    <option value="in_progress" selected>In Progress</option>
+                                    <option value="completed">Completed</option>
+                                    <option value="cancelled">Cancelled</option>
+                                </select>
+                            </td>
+                            <td class="px-6 py-4">
+                                <button class="text-blue-600 hover:text-blue-800 mr-3">Edit</button>
+                                <button class="text-red-600 hover:text-red-800">Delete</button>
+                            </td>
+                        </tr>
+                        <tr class="hover:bg-gray-50">
+                            <td class="px-6 py-4">2024-02-21 9:00 AM</td>
+                            <td class="px-6 py-4">James Wilson</td>
+                            <td class="px-6 py-4">Ford F-150 2021</td>
+                            <td class="px-6 py-4">Tire Rotation</td>
+                            <td class="px-6 py-4">
+                                <select class="px-2 py-1 border rounded text-sm">
+                                    <option value="pending" selected>Pending</option>
+                                    <option value="in_progress">In Progress</option>
+                                    <option value="completed">Completed</option>
+                                    <option value="cancelled">Cancelled</option>
+                                </select>
+                            </td>
+                            <td class="px-6 py-4">
+                                <button class="text-blue-600 hover:text-blue-800 mr-3">Edit</button>
+                                <button class="text-red-600 hover:text-red-800">Delete</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="mt-6 flex justify-between">
+                <div>
+                    <span class="text-sm text-gray-500">Showing 1-3 of 15 appointments</span>
+                </div>
+                <div class="flex space-x-2">
+                    <button class="px-3 py-1 border rounded hover:bg-gray-100">Previous</button>
+                    <button class="px-3 py-1 border rounded bg-blue-600 text-white">1</button>
+                    <button class="px-3 py-1 border rounded hover:bg-gray-100">2</button>
+                    <button class="px-3 py-1 border rounded hover:bg-gray-100">3</button>
+                    <button class="px-3 py-1 border rounded hover:bg-gray-100">Next</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Calendar View Toggle -->
+        <div class="mt-8">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-semibold text-gray-800">Calendar View</h3>
+                <div class="flex space-x-2">
+                    <button class="px-4 py-2 bg-gray-200 rounded-lg">Day</button>
+                    <button class="px-4 py-2 bg-blue-600 text-white rounded-lg">Week</button>
+                    <button class="px-4 py-2 bg-gray-200 rounded-lg">Month</button>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow p-6">
+                <!-- Calendar would go here - simplified representation -->
+                <div class="grid grid-cols-7 gap-1">
+                    <div class="text-center font-semibold text-gray-500 p-2">Mon</div>
+                    <div class="text-center font-semibold text-gray-500 p-2">Tue</div>
+                    <div class="text-center font-semibold text-gray-500 p-2">Wed</div>
+                    <div class="text-center font-semibold text-gray-500 p-2">Thu</div>
+                    <div class="text-center font-semibold text-gray-500 p-2">Fri</div>
+                    <div class="text-center font-semibold text-gray-500 p-2">Sat</div>
+                    <div class="text-center font-semibold text-gray-500 p-2">Sun</div>
+                    
+                    <!-- Calendar cells with appointments -->
+                    <div class="border p-2 h-24">
+                        <p class="text-xs">20/02</p>
+                        <div class="mt-1 text-xs p-1 bg-blue-100 rounded">10:00 - John D.</div>
+                        <div class="mt-1 text-xs p-1 bg-blue-100 rounded">13:30 - Maria G.</div>
+                    </div>
+                    <div class="border p-2 h-24">
+                        <p class="text-xs">21/02</p>
+                        <div class="mt-1 text-xs p-1 bg-blue-100 rounded">9:00 - James W.</div>
+                    </div>
+                    <div class="border p-2 h-24"><p class="text-xs">22/02</p></div>
+                    <div class="border p-2 h-24"><p class="text-xs">23/02</p></div>
+                    <div class="border p-2 h-24"><p class="text-xs">24/02</p></div>
+                    <div class="border p-2 h-24"><p class="text-xs">25/02</p></div>
+                    <div class="border p-2 h-24"><p class="text-xs">26/02</p></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Schedule Modal -->
+    <div id="adminScheduleModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-8 max-w-2xl w-full">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-2xl font-semibold">Schedule New Appointment</h3>
+                <button onclick="document.getElementById('adminScheduleModal').classList.add('hidden')" class="text-gray-500 hover:text-gray-700">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <form class="space-y-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Client</label>
+                    <div class="flex space-x-2">
+                        <select class="w-full px-4 py-2 border rounded-lg">
+                            <option value="">Select Existing Client</option>
+                            <option value="john_doe">John Doe</option>
+                            <option value="maria_garcia">Maria Garcia</option>
+                            <option value="james_wilson">James Wilson</option>
+                        </select>
+                        <button type="button" class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">+ New</button>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                        <input type="date" required class="w-full px-4 py-2 border rounded-lg">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Time</label>
+                        <input type="time" required class="w-full px-4 py-2 border rounded-lg">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Vehicle</label>
+                    <select required class="w-full px-4 py-2 border rounded-lg">
+                        <option value="">Select Vehicle</option>
+                        <option value="toyota_camry">Toyota Camry 2020 (John Doe)</option>
+                        <option value="honda_civic">Honda Civic 2019 (Maria Garcia)</option>
+                        <option value="ford_f150">Ford F-150 2021 (James Wilson)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Service Type</label>
+                    <select required class="w-full px-4 py-2 border rounded-lg">
+                        <option value="">Select Service</option>
+                        <option value="oil_change">Oil Change</option>
+                        <option value="tire_rotation">Tire Rotation</option>
+                        <option value="brake_service">Brake Service</option>
+                        <option value="engine_diagnostic">Engine Diagnostic</option>
+                        <option value="ac_service">A/C Service</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Assign Technician</label>
+                    <select class="w-full px-4 py-2 border rounded-lg">
+                        <option value="">Select Technician</option>
+                        <option value="miguel_rodriguez">Miguel Rodriguez</option>
+                        <option value="carlos_jimenez">Carlos Jimenez</option>
+                        <option value="ana_martinez">Ana Martinez</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Additional Notes</label>
+                    <textarea class="w-full px-4 py-2 border rounded-lg" rows="3"></textarea>
+                </div>
+                <div class="flex justify-end space-x-4">
+                    <button type="button" onclick="document.getElementById('adminScheduleModal').classList.add('hidden')" class="px-6 py-2 border rounded-lg hover:bg-gray-100">Cancel</button>
+                    <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Schedule</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Toggle modal function
+        function toggleModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal.classList.contains('hidden')) {
+                modal.classList.remove('hidden');
+            } else {
+                modal.classList.add('hidden');
+            }
+        }
+    </script>
+
+    <footer class="bg-gray-800 text-white py-6 px-6 mt-8">
+        <div class="container mx-auto text-center">
+            <p>&copy; 2024 AutoCare Rodriguez. All rights reserved.</p>
+        </div>
+    </footer>
+</body>
+</html>
