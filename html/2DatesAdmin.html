@@ -1,276 +1,534 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard - AutoCare Rodriguez</title>
+    <title>Administración de Citas - AutoCare Rodriguez</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-50">
-    <nav class="bg-gray-800 text-white px-6 py-4">
+<body class="bg-gray-100">
+    <nav class="bg-gray-800 text-white px-4 py-3">
         <div class="flex items-center justify-between">
-            <h1 class="text-2xl font-bold">AutoCare Rodriguez - Admin</h1>
-            <div class="flex items-center space-x-4">
-                
-                <div class="flex space-x-4">
-                    <a href="admin-clients.html">
-                        <button class="px-4 py-2 rounded hover:bg-gray-700">Clients</button>
-                    </a>                  
-                    <a href="admin-appointments.html">
-                        <button class="px-4 py-2 rounded bg-gray-700">Appointments</button>
-                    </a>
-                    <a href="admin-services.html">
-                        <button class="px-4 py-2 rounded hover:bg-gray-700">Services</button>
-                    </a>
-                    <a href="admin-inventory.html">
-                        <button class="px-4 py-2 rounded hover:bg-gray-700">Inventory</button>
-                    </a>
-                    <a href="admin-billing.html">
-                        <button class="px-4 py-2 rounded hover:bg-gray-700">Billing</button>
-                    </a>
-                    <a href="admin-users.html">
-                        <button class="px-4 py-2 rounded hover:bg-gray-700">Users</button>
-                    </a>
-                </div>
+            <h1 class="text-xl font-bold">AutoCare Rodriguez</h1>
+            <div class="flex space-x-2">
+                <a href="/admin/clientes" class="px-3 py-1 rounded hover:bg-gray-700">Clientes</a>                  
+                <a href="/admin/citas" class="px-3 py-1 rounded bg-gray-700">Citas</a>
+                <a href="/admin/servicios" class="px-3 py-1 rounded hover:bg-gray-700">Servicios</a>
+                <a href="/admin/inventario" class="px-3 py-1 rounded hover:bg-gray-700">Inventario</a>
             </div>
         </div>
     </nav>
 
-    <div class="container mx-auto px-4 py-8">
+    <div class="container mx-auto px-4 py-6">
         <div class="flex justify-between items-center mb-6">
-            <h2 class="text-3xl font-semibold text-gray-800">Appointments Management</h2>
-            <button class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors" onclick="document.getElementById('adminScheduleModal').classList.remove('hidden')">Add New Appointment</button>
+            <h2 class="text-2xl font-semibold">Gestión de Citas</h2>
+            <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700" 
+                    onclick="nuevaCita()">
+                Nueva Cita
+            </button>
         </div>
         
-        <div class="bg-white rounded-lg shadow p-6">
-            <div class="flex flex-col md:flex-row gap-4 mb-6">
-                <input type="date" class="flex-1 px-4 py-2 border rounded-lg">
-                <input type="text" placeholder="Search Client" class="flex-1 px-4 py-2 border rounded-lg">
-                <select class="px-4 py-2 border rounded-lg">
-                    <option value="">All Status</option>
-                    <option value="pending">Pending</option>
-                    <option value="in_progress">In Progress</option>
-                    <option value="completed">Completed</option>
-                    <option value="cancelled">Cancelled</option>
+        <!-- Filtros Simplificados -->
+        <div class="bg-white rounded shadow p-4 mb-6">
+            <div class="flex flex-wrap gap-2">
+                <input type="date" id="filtroFecha" class="px-3 py-2 border rounded" placeholder="Fecha">
+                <input type="text" id="filtroCliente" class="px-3 py-2 border rounded" placeholder="Buscar Cliente">
+                <select id="filtroEstado" class="px-3 py-2 border rounded">
+                    <option value="">Todos los Estados</option>
+                    <option value="pendiente">Pendiente</option>
+                    <option value="en_progreso">En Progreso</option>
+                    <option value="completado">Completado</option>
+                    <option value="cancelado">Cancelado</option>
                 </select>
-                <button class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Filter</button>
-            </div>
-            
-            <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date & Time</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Client</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vehicle</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Service</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
-                        <tr class="hover:bg-gray-50">
-                            <td class="px-6 py-4">2024-02-20 10:00 AM</td>
-                            <td class="px-6 py-4">John Doe</td>
-                            <td class="px-6 py-4">Toyota Camry 2020</td>
-                            <td class="px-6 py-4">Oil Change</td>
-                            <td class="px-6 py-4">
-                                <select class="px-2 py-1 border rounded text-sm">
-                                    <option value="pending">Pending</option>
-                                    <option value="in_progress">In Progress</option>
-                                    <option value="completed">Completed</option>
-                                    <option value="cancelled">Cancelled</option>
-                                </select>
-                            </td>
-                            <td class="px-6 py-4">
-                                <button class="text-blue-600 hover:text-blue-800 mr-3">Edit</button>
-                                <button class="text-red-600 hover:text-red-800">Delete</button>
-                            </td>
-                        </tr>
-                        <tr class="hover:bg-gray-50">
-                            <td class="px-6 py-4">2024-02-20 1:30 PM</td>
-                            <td class="px-6 py-4">Maria Garcia</td>
-                            <td class="px-6 py-4">Honda Civic 2019</td>
-                            <td class="px-6 py-4">Brake Service</td>
-                            <td class="px-6 py-4">
-                                <select class="px-2 py-1 border rounded text-sm">
-                                    <option value="pending">Pending</option>
-                                    <option value="in_progress" selected>In Progress</option>
-                                    <option value="completed">Completed</option>
-                                    <option value="cancelled">Cancelled</option>
-                                </select>
-                            </td>
-                            <td class="px-6 py-4">
-                                <button class="text-blue-600 hover:text-blue-800 mr-3">Edit</button>
-                                <button class="text-red-600 hover:text-red-800">Delete</button>
-                            </td>
-                        </tr>
-                        <tr class="hover:bg-gray-50">
-                            <td class="px-6 py-4">2024-02-21 9:00 AM</td>
-                            <td class="px-6 py-4">James Wilson</td>
-                            <td class="px-6 py-4">Ford F-150 2021</td>
-                            <td class="px-6 py-4">Tire Rotation</td>
-                            <td class="px-6 py-4">
-                                <select class="px-2 py-1 border rounded text-sm">
-                                    <option value="pending" selected>Pending</option>
-                                    <option value="in_progress">In Progress</option>
-                                    <option value="completed">Completed</option>
-                                    <option value="cancelled">Cancelled</option>
-                                </select>
-                            </td>
-                            <td class="px-6 py-4">
-                                <button class="text-blue-600 hover:text-blue-800 mr-3">Edit</button>
-                                <button class="text-red-600 hover:text-red-800">Delete</button>
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-            
-            <div class="mt-6 flex justify-between">
-                <div>
-                    <span class="text-sm text-gray-500">Showing 1-3 of 15 appointments</span>
-                </div>
-                <div class="flex space-x-2">
-                    <button class="px-3 py-1 border rounded hover:bg-gray-100">Previous</button>
-                    <button class="px-3 py-1 border rounded bg-blue-600 text-white">1</button>
-                    <button class="px-3 py-1 border rounded hover:bg-gray-100">2</button>
-                    <button class="px-3 py-1 border rounded hover:bg-gray-100">3</button>
-                    <button class="px-3 py-1 border rounded hover:bg-gray-100">Next</button>
-                </div>
+                <button onclick="filtrarCitas()" class="px-4 py-2 bg-blue-600 text-white rounded">Filtrar</button>
             </div>
         </div>
         
-        <!-- Calendar View Toggle -->
-        <div class="mt-8">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-xl font-semibold text-gray-800">Calendar View</h3>
-                <div class="flex space-x-2">
-                    <button class="px-4 py-2 bg-gray-200 rounded-lg">Day</button>
-                    <button class="px-4 py-2 bg-blue-600 text-white rounded-lg">Week</button>
-                    <button class="px-4 py-2 bg-gray-200 rounded-lg">Month</button>
-                </div>
-            </div>
-            <div class="bg-white rounded-lg shadow p-6">
-                <!-- Calendar would go here - simplified representation -->
-                <div class="grid grid-cols-7 gap-1">
-                    <div class="text-center font-semibold text-gray-500 p-2">Mon</div>
-                    <div class="text-center font-semibold text-gray-500 p-2">Tue</div>
-                    <div class="text-center font-semibold text-gray-500 p-2">Wed</div>
-                    <div class="text-center font-semibold text-gray-500 p-2">Thu</div>
-                    <div class="text-center font-semibold text-gray-500 p-2">Fri</div>
-                    <div class="text-center font-semibold text-gray-500 p-2">Sat</div>
-                    <div class="text-center font-semibold text-gray-500 p-2">Sun</div>
-                    
-                    <!-- Calendar cells with appointments -->
-                    <div class="border p-2 h-24">
-                        <p class="text-xs">20/02</p>
-                        <div class="mt-1 text-xs p-1 bg-blue-100 rounded">10:00 - John D.</div>
-                        <div class="mt-1 text-xs p-1 bg-blue-100 rounded">13:30 - Maria G.</div>
-                    </div>
-                    <div class="border p-2 h-24">
-                        <p class="text-xs">21/02</p>
-                        <div class="mt-1 text-xs p-1 bg-blue-100 rounded">9:00 - James W.</div>
-                    </div>
-                    <div class="border p-2 h-24"><p class="text-xs">22/02</p></div>
-                    <div class="border p-2 h-24"><p class="text-xs">23/02</p></div>
-                    <div class="border p-2 h-24"><p class="text-xs">24/02</p></div>
-                    <div class="border p-2 h-24"><p class="text-xs">25/02</p></div>
-                    <div class="border p-2 h-24"><p class="text-xs">26/02</p></div>
+        <!-- Tabla de Citas -->
+        <div class="bg-white rounded shadow overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-2 text-left">Fecha y Hora</th>
+                        <th class="px-4 py-2 text-left">Cliente</th>
+                        <th class="px-4 py-2 text-left">Vehículo</th>
+                        <th class="px-4 py-2 text-left">Servicio</th>
+                        <th class="px-4 py-2 text-left">Estado</th>
+                        <th class="px-4 py-2 text-left">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="tablaCitas" class="divide-y divide-gray-200">
+                    <!-- Las filas de citas se cargarán dinámicamente con JavaScript -->
+                </tbody>
+            </table>
+            
+            <!-- Paginación Simplificada -->
+            <div class="p-4 flex justify-between items-center">
+                <span id="infoPaginacion" class="text-sm text-gray-500">
+                    Cargando información...
+                </span>
+                <div id="paginacion" class="flex space-x-1">
+                    <!-- Los botones de paginación se generarán dinámicamente -->
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Admin Schedule Modal -->
-    <div id="adminScheduleModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white rounded-lg p-8 max-w-2xl w-full">
-            <div class="flex justify-between items-center mb-6">
-                <h3 class="text-2xl font-semibold">Schedule New Appointment</h3>
-                <button onclick="document.getElementById('adminScheduleModal').classList.add('hidden')" class="text-gray-500 hover:text-gray-700">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+    <!-- Modal para Nueva/Editar Cita -->
+    <div id="modalCita" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 max-w-md w-full">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-semibold" id="modalTitle">Programar Nueva Cita</h3>
+                <button onclick="document.getElementById('modalCita').classList.add('hidden')" class="text-gray-500 hover:text-gray-700">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
                 </button>
             </div>
-            <form class="space-y-6">
+            <form id="formCita" class="space-y-4">
+                <input type="hidden" id="id_cita" value="">
+                
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Client</label>
-                    <div class="flex space-x-2">
-                        <select class="w-full px-4 py-2 border rounded-lg">
-                            <option value="">Select Existing Client</option>
-                            <option value="john_doe">John Doe</option>
-                            <option value="maria_garcia">Maria Garcia</option>
-                            <option value="james_wilson">James Wilson</option>
-                        </select>
-                        <button type="button" class="px-4 py-2 bg-gray-200 rounded-lg hover:bg-gray-300">+ New</button>
-                    </div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Cliente</label>
+                    <select id="id_cliente" required class="w-full px-3 py-2 border rounded">
+                        <option value="">Seleccione Cliente</option>
+                        <!-- Se cargará dinámicamente -->
+                    </select>
                 </div>
-                <div class="grid grid-cols-2 gap-4">
+                
+                <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Date</label>
-                        <input type="date" required class="w-full px-4 py-2 border rounded-lg">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Fecha</label>
+                        <input type="date" id="fecha" required class="w-full px-3 py-2 border rounded">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Time</label>
-                        <input type="time" required class="w-full px-4 py-2 border rounded-lg">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Hora</label>
+                        <input type="time" id="hora" required class="w-full px-3 py-2 border rounded">
                     </div>
                 </div>
+                
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Vehicle</label>
-                    <select required class="w-full px-4 py-2 border rounded-lg">
-                        <option value="">Select Vehicle</option>
-                        <option value="toyota_camry">Toyota Camry 2020 (John Doe)</option>
-                        <option value="honda_civic">Honda Civic 2019 (Maria Garcia)</option>
-                        <option value="ford_f150">Ford F-150 2021 (James Wilson)</option>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Vehículo</label>
+                    <select id="id_vehiculo" required class="w-full px-3 py-2 border rounded">
+                        <option value="">Seleccione Vehículo</option>
+                        <!-- Se cargará dinámicamente -->
                     </select>
                 </div>
+                
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Service Type</label>
-                    <select required class="w-full px-4 py-2 border rounded-lg">
-                        <option value="">Select Service</option>
-                        <option value="oil_change">Oil Change</option>
-                        <option value="tire_rotation">Tire Rotation</option>
-                        <option value="brake_service">Brake Service</option>
-                        <option value="engine_diagnostic">Engine Diagnostic</option>
-                        <option value="ac_service">A/C Service</option>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Servicio</label>
+                    <select id="id_servicio" required class="w-full px-3 py-2 border rounded">
+                        <option value="">Seleccione Servicio</option>
+                        <!-- Se cargará dinámicamente -->
                     </select>
                 </div>
+                
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Assign Technician</label>
-                    <select class="w-full px-4 py-2 border rounded-lg">
-                        <option value="">Select Technician</option>
-                        <option value="miguel_rodriguez">Miguel Rodriguez</option>
-                        <option value="carlos_jimenez">Carlos Jimenez</option>
-                        <option value="ana_martinez">Ana Martinez</option>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Técnico</label>
+                    <select id="id_tecnico" class="w-full px-3 py-2 border rounded">
+                        <option value="">Seleccione Técnico</option>
+                        <!-- Se cargará dinámicamente -->
                     </select>
                 </div>
+                
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Additional Notes</label>
-                    <textarea class="w-full px-4 py-2 border rounded-lg" rows="3"></textarea>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Notas</label>
+                    <textarea id="notas" class="w-full px-3 py-2 border rounded" rows="2"></textarea>
                 </div>
-                <div class="flex justify-end space-x-4">
-                    <button type="button" onclick="document.getElementById('adminScheduleModal').classList.add('hidden')" class="px-6 py-2 border rounded-lg hover:bg-gray-100">Cancel</button>
-                    <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Schedule</button>
+                
+                <div class="flex justify-end space-x-3 pt-2">
+                    <button type="button" onclick="document.getElementById('modalCita').classList.add('hidden')" 
+                            class="px-4 py-2 border rounded hover:bg-gray-100">
+                        Cancelar
+                    </button>
+                    <button type="button" onclick="guardarCita()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                        Guardar
+                    </button>
                 </div>
             </form>
         </div>
     </div>
 
     <script>
-        // Toggle modal function
-        function toggleModal(modalId) {
-            const modal = document.getElementById(modalId);
-            if (modal.classList.contains('hidden')) {
-                modal.classList.remove('hidden');
-            } else {
-                modal.classList.add('hidden');
+        // Variables globales
+        let paginaActual = 1;
+        const citasPorPagina = 10;
+        let totalCitas = 0;
+        let totalPaginas = 0;
+        
+        // Cargar datos al iniciar la página
+        document.addEventListener('DOMContentLoaded', () => {
+            cargarCitas();
+            cargarClientes();
+            cargarServicios();
+            cargarTecnicos();
+        });
+        
+        // Función para cargar la lista de citas
+        async function cargarCitas(pagina = 1, filtros = {}) {
+            try {
+                // Construir query string para filtros
+                const params = new URLSearchParams();
+                params.append('pagina', pagina);
+                params.append('limite', citasPorPagina);
+                
+                if (filtros.fecha) params.append('fecha', filtros.fecha);
+                if (filtros.cliente) params.append('cliente', filtros.cliente);
+                if (filtros.estado) params.append('estado', filtros.estado);
+                
+                const response = await fetch(`/api/citas?${params.toString()}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    mostrarCitas(data.citas);
+                    actualizarPaginacion(data.total, data.pagina);
+                } else {
+                    alert('Error al cargar las citas: ' + data.mensaje);
+                }
+            } catch (error) {
+                console.error('Error al cargar citas:', error);
+                alert('Error de conexión al servidor');
+            }
+        }
+        
+        // Mostrar citas en la tabla
+        function mostrarCitas(citas) {
+            const tabla = document.getElementById('tablaCitas');
+            tabla.innerHTML = '';
+            
+            if (citas.length === 0) {
+                const row = document.createElement('tr');
+                row.innerHTML = `<td colspan="6" class="px-4 py-4 text-center">No se encontraron citas</td>`;
+                tabla.appendChild(row);
+                return;
+            }
+            
+            citas.forEach(cita => {
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50';
+                
+                row.innerHTML = `
+                    <td class="px-4 py-2">${cita.fecha} ${cita.hora}</td>
+                    <td class="px-4 py-2">${cita.nombre_cliente}</td>
+                    <td class="px-4 py-2">${cita.vehiculo}</td>
+                    <td class="px-4 py-2">${cita.servicio}</td>
+                    <td class="px-4 py-2">
+                        <select onchange="actualizarEstado('${cita.id}', this.value)" class="px-2 py-1 border rounded text-sm">
+                            <option value="pendiente" ${cita.estado === 'pendiente' ? 'selected' : ''}>Pendiente</option>
+                            <option value="en_progreso" ${cita.estado === 'en_progreso' ? 'selected' : ''}>En Progreso</option>
+                            <option value="completado" ${cita.estado === 'completado' ? 'selected' : ''}>Completado</option>
+                            <option value="cancelado" ${cita.estado === 'cancelado' ? 'selected' : ''}>Cancelado</option>
+                        </select>
+                    </td>
+                    <td class="px-4 py-2">
+                        <button onclick="editarCita('${cita.id}')" class="text-blue-600 hover:text-blue-800 mr-2">Editar</button>
+                        <button onclick="eliminarCita('${cita.id}')" class="text-red-600 hover:text-red-800">Eliminar</button>
+                    </td>
+                `;
+                
+                tabla.appendChild(row);
+            });
+        }
+        
+        // Actualizar paginación
+        function actualizarPaginacion(total, pagina) {
+            totalCitas = total;
+            paginaActual = pagina;
+            totalPaginas = Math.ceil(total / citasPorPagina);
+            
+            // Actualizar texto informativo
+            const inicio = (pagina - 1) * citasPorPagina + 1;
+            const fin = Math.min(inicio + citasPorPagina - 1, total);
+            document.getElementById('infoPaginacion').textContent = `Mostrando ${inicio} - ${fin} de ${total} citas`;
+            
+            // Generar botones de paginación
+            const paginacion = document.getElementById('paginacion');
+            paginacion.innerHTML = '';
+            
+            // Botón Anterior
+            if (pagina > 1) {
+                const btnAnterior = document.createElement('button');
+                btnAnterior.className = 'px-3 py-1 border rounded hover:bg-gray-100';
+                btnAnterior.textContent = 'Anterior';
+                btnAnterior.onclick = () => cargarCitas(pagina - 1, obtenerFiltros());
+                paginacion.appendChild(btnAnterior);
+            }
+            
+            // Números de página
+            for (let i = 1; i <= totalPaginas; i++) {
+                if (totalPaginas <= 5 || i === 1 || i === totalPaginas || (i >= pagina - 1 && i <= pagina + 1)) {
+                    const btnPagina = document.createElement('button');
+                    btnPagina.className = `px-3 py-1 border rounded ${pagina === i ? 'bg-blue-600 text-white' : 'hover:bg-gray-100'}`;
+                    btnPagina.textContent = i;
+                    btnPagina.onclick = () => cargarCitas(i, obtenerFiltros());
+                    paginacion.appendChild(btnPagina);
+                } else if (i === pagina - 2 || i === pagina + 2) {
+                    const puntos = document.createElement('span');
+                    puntos.className = 'px-3 py-1';
+                    puntos.textContent = '...';
+                    paginacion.appendChild(puntos);
+                }
+            }
+            
+            // Botón Siguiente
+            if (pagina < totalPaginas) {
+                const btnSiguiente = document.createElement('button');
+                btnSiguiente.className = 'px-3 py-1 border rounded hover:bg-gray-100';
+                btnSiguiente.textContent = 'Siguiente';
+                btnSiguiente.onclick = () => cargarCitas(pagina + 1, obtenerFiltros());
+                paginacion.appendChild(btnSiguiente);
+            }
+        }
+        
+        // Cargar catálogos para formularios
+        async function cargarClientes() {
+            try {
+                const response = await fetch('/api/clientes');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const select = document.getElementById('id_cliente');
+                    select.innerHTML = '<option value="">Seleccione Cliente</option>';
+                    
+                    data.clientes.forEach(cliente => {
+                        const option = document.createElement('option');
+                        option.value = cliente.id;
+                        option.textContent = cliente.nombre;
+                        select.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Error al cargar clientes:', error);
+            }
+        }
+        
+        async function cargarServicios() {
+            try {
+                const response = await fetch('/api/servicios');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const select = document.getElementById('id_servicio');
+                    select.innerHTML = '<option value="">Seleccione Servicio</option>';
+                    
+                    data.servicios.forEach(servicio => {
+                        const option = document.createElement('option');
+                        option.value = servicio.id;
+                        option.textContent = servicio.nombre;
+                        select.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Error al cargar servicios:', error);
+            }
+        }
+        
+        async function cargarTecnicos() {
+            try {
+                const response = await fetch('/api/tecnicos');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const select = document.getElementById('id_tecnico');
+                    select.innerHTML = '<option value="">Seleccione Técnico</option>';
+                    
+                    data.tecnicos.forEach(tecnico => {
+                        const option = document.createElement('option');
+                        option.value = tecnico.id;
+                        option.textContent = tecnico.nombre;
+                        select.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Error al cargar técnicos:', error);
+            }
+        }
+        
+        // Cargar vehículos cuando se selecciona un cliente
+        document.getElementById('id_cliente').addEventListener('change', async function() {
+            const clienteId = this.value;
+            const vehiculoSelect = document.getElementById('id_vehiculo');
+            
+            // Limpiar opciones actuales
+            vehiculoSelect.innerHTML = '<option value="">Seleccione Vehículo</option>';
+            
+            if (clienteId) {
+                try {
+                    const response = await fetch(`/api/vehiculos?cliente=${clienteId}`);
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        data.vehiculos.forEach(vehiculo => {
+                            const option = document.createElement('option');
+                            option.value = vehiculo.id;
+                            option.textContent = `${vehiculo.marca} ${vehiculo.modelo} (${vehiculo.ano})`;
+                            vehiculoSelect.appendChild(option);
+                        });
+                    }
+                } catch (error) {
+                    console.error('Error al cargar vehículos:', error);
+                }
+            }
+        });
+        
+        // Función para filtrar citas
+        function filtrarCitas() {
+            const filtros = obtenerFiltros();
+            cargarCitas(1, filtros);
+        }
+        
+        function obtenerFiltros() {
+            return {
+                fecha: document.getElementById('filtroFecha').value,
+                cliente: document.getElementById('filtroCliente').value,
+                estado: document.getElementById('filtroEstado').value
+            };
+        }
+        
+        // Función para actualizar estado de una cita
+        async function actualizarEstado(id, estado) {
+            try {
+                const response = await fetch(`/api/citas/${id}/estado`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ estado })
+                });
+                
+                const data = await response.json();
+                
+                if (!data.success) {
+                    alert('Error al actualizar estado: ' + data.mensaje);
+                    // Recargar citas para mostrar el estado original
+                    cargarCitas(paginaActual, obtenerFiltros());
+                }
+            } catch (error) {
+                console.error('Error al actualizar estado:', error);
+                alert('Error de conexión al servidor');
+                cargarCitas(paginaActual, obtenerFiltros());
+            }
+        }
+        
+        // Función para editar una cita
+        async function editarCita(id) {
+            try {
+                const response = await fetch(`/api/citas/${id}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const cita = data.cita;
+                    
+                    document.getElementById('modalTitle').textContent = 'Editar Cita';
+                    document.getElementById('id_cita').value = cita.id;
+                    document.getElementById('id_cliente').value = cita.id_cliente;
+                    document.getElementById('fecha').value = cita.fecha;
+                    document.getElementById('hora').value = cita.hora;
+                    
+                    // Disparar el evento change para cargar los vehículos del cliente
+                    const event = new Event('change');
+                    document.getElementById('id_cliente').dispatchEvent(event);
+                    
+                    // Establecer valores después de cargar vehículos
+                    setTimeout(() => {
+                        document.getElementById('id_vehiculo').value = cita.id_vehiculo;
+                        document.getElementById('id_servicio').value = cita.id_servicio;
+                        document.getElementById('id_tecnico').value = cita.id_tecnico || '';
+                        document.getElementById('notas').value = cita.notas || '';
+                    }, 500);
+                    
+                    document.getElementById('modalCita').classList.remove('hidden');
+                } else {
+                    alert('Error al cargar información de la cita: ' + data.mensaje);
+                }
+            } catch (error) {
+                console.error('Error al cargar cita:', error);
+                alert('Error de conexión al servidor');
+            }
+        }
+        
+        // Función para eliminar una cita
+        async function eliminarCita(id) {
+            if (confirm('¿Estás seguro de eliminar esta cita?')) {
+                try {
+                    const response = await fetch(`/api/citas/${id}`, {
+                        method: 'DELETE'
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        alert('Cita eliminada correctamente');
+                        cargarCitas(paginaActual, obtenerFiltros());
+                    } else {
+                        alert('Error al eliminar cita: ' + data.mensaje);
+                    }
+                } catch (error) {
+                    console.error('Error al eliminar cita:', error);
+                    alert('Error de conexión al servidor');
+                }
+            }
+        }
+        
+        // Función para crear una nueva cita
+        function nuevaCita() {
+            document.getElementById('modalTitle').textContent = 'Programar Nueva Cita';
+            document.getElementById('formCita').reset();
+            document.getElementById('id_cita').value = '';
+            document.getElementById('modalCita').classList.remove('hidden');
+        }
+        
+        // Función para guardar una cita (crear o actualizar)
+        async function guardarCita() {
+            const id = document.getElementById('id_cita').value;
+            const esNueva = id === '';
+            
+            const citaData = {
+                id_cliente: document.getElementById('id_cliente').value,
+                id_vehiculo: document.getElementById('id_vehiculo').value,
+                id_servicio: document.getElementById('id_servicio').value,
+                id_tecnico: document.getElementById('id_tecnico').value || null,
+                fecha: document.getElementById('fecha').value,
+                hora: document.getElementById('hora').value,
+                notas: document.getElementById('notas').value
+            };
+            
+            // Validar campos requeridos
+            if (!citaData.id_cliente || !citaData.id_vehiculo || !citaData.id_servicio || !citaData.fecha || !citaData.hora) {
+                alert('Por favor complete todos los campos requeridos');
+                return;
+            }
+            
+            try {
+                const url = esNueva ? '/api/citas' : `/api/citas/${id}`;
+                const method = esNueva ? 'POST' : 'PUT';
+                
+                const response = await fetch(url, {
+                    method,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(citaData)
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert(esNueva ? 'Cita creada correctamente' : 'Cita actualizada correctamente');
+                    document.getElementById('modalCita').classList.add('hidden');
+                    cargarCitas(paginaActual, obtenerFiltros());
+                } else {
+                    alert(`Error al ${esNueva ? 'crear' : 'actualizar'} cita: ${data.mensaje}`);
+                }
+            } catch (error) {
+                console.error(`Error al ${esNueva ? 'crear' : 'actualizar'} cita:`, error);
+                alert('Error de conexión al servidor');
             }
         }
     </script>
 
-    <footer class="bg-gray-800 text-white py-6 px-6 mt-8">
-        <div class="container mx-auto text-center">
-            <p>&copy; 2024 AutoCare Rodriguez. All rights reserved.</p>
-        </div>
+    <footer class="bg-gray-800 text-white py-3 px-4 mt-6 text-center text-sm">
+        <p>&copy; 2024 AutoCare Rodriguez. Todos los derechos reservados.</p>
     </footer>
 </body>
 </html>
