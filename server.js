@@ -11,6 +11,17 @@ const PORT = 3000;
 app.use(cors());
 app.use(bodyParser.json());
 app.use(express.json());
+const bcrypt = require('bcrypt');
+
+// Middleware (aplicar en este orden)
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+  }));
+  app.use(bodyParser.json());
+  app.use(express.json());
+
 
 // Configuración de conexión a SQL Server
 const dbConfig = {
@@ -20,7 +31,7 @@ const dbConfig = {
     database: process.env.DB_DATABASE,
     port: parseInt(process.env.DB_PORT),
     options: {
-        encrypt: false, // Cambiar a true si usas Azure
+        encrypt: false,
         trustServerCertificate: true
     }
 };
@@ -232,6 +243,201 @@ app.put("/working-users/:id", async (req, res) => {
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
+// Asegúrate de tener esta importación al inicio del archivo
+
+
+// GET - Obtener todos los usuarios
+app.get('/users', async (req, res) => {
+  try {
+    // Utilizamos la conexión existente
+    const result = await sql.query('SELECT ID, FullName, Email, PhoneNumber FROM Users');
+    
+    res.json(result.recordset);
+  } catch (err) {
+    console.error('Error al obtener usuarios:', err);
+    res.status(500).json({ message: 'Error al obtener los usuarios', error: err.message });
+  }
+});
+
+// GET - Obtener un usuario por ID
+app.get('/users/:id', async (req, res) => {
+  try {
+    const request = new sql.Request();
+    const result = await request
+      .input('id', sql.Int, req.params.id)
+      .query('SELECT ID, FullName, Email, PhoneNumber FROM Users WHERE ID = @id');
+    
+    if (result.recordset.length === 0) {
+      return res.status(404).json({ message: 'Usuario no encontrado' });
+    }
+    
+    res.json(result.recordset[0]);
+  } catch (err) {
+    console.error('Error al obtener usuario:', err);
+    res.status(500).json({ message: 'Error al obtener el usuario', error: err.message });
+  }
+});
+
+// POST - Crear un nuevo usuario
+app.post('/users', async (req, res) => {
+  try {
+    const { fullName, email, phoneNumber, password } = req.body;
+    
+    // Validaciones básicas
+    if (!fullName || !email || !password) {
+      return res.status(400).json({ message: 'Nombre, email y contraseña son obligatorios' });
+    }
+    
+    // Hashear la contraseña
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+    
+    // Verificar si el email ya existe
+    const checkRequest = new sql.Request();
+    const checkEmail = await checkRequest
+      .input('email', sql.NVarChar, email)
+      .query('SELECT COUNT(*) as count FROM Users WHERE Email = @email');
+    
+    if (checkEmail.recordset[0].count > 0) {
+      return res.status(400).json({ message: 'El correo electrónico ya está registrado' });
+    }
+    
+    // Insertar el nuevo usuario
+    const insertRequest = new sql.Request();
+    const result = await insertRequest
+      .input('fullName', sql.NVarChar, fullName)
+      .input('email', sql.NVarChar, email)
+      .input('phoneNumber', sql.NVarChar, phoneNumber || null)
+      .input('password', sql.NVarChar, hashedPassword)
+      .query(`
+        INSERT INTO Users (FullName, Email, PhoneNumber, Password)
+        OUTPUT INSERTED.ID
+        VALUES (@fullName, @email, @phoneNumber, @password)
+      `);
+    
+    res.status(201).json({ 
+      message: 'Usuario creado exitosamente',
+      userId: result.recordset[0].ID
+    });
+  } catch (err) {
+    console.error('Error al crear usuario:', err);
+    res.status(500).json({ message: 'Error al crear el usuario', error: err.message });
+  }
+});
+
+// PUT - Actualizar un usuario existente
+app.put('/users/:id', async (req, res) => {
+  try {
+    const { fullName, email, phoneNumber, password } = req.body;
+    const userId = req.params.id;
+    
+    // Validaciones básicas
+    if (!fullName && !email && !phoneNumber && !password) {
+      return res.status(400).json({ message: 'Debe proporcionar al menos un campo para actualizar' });
+    }
+    
+    // Verificar si el usuario existe
+    const checkRequest = new sql.Request();
+    const checkUser = await checkRequest
+      .input('id', sql.Int, userId)
+      .query('SELECT COUNT(*) as count FROM Users WHERE ID = @id');
+    
+    if (checkUser.recordset[0].count === 0) {
+      return res.status(404).json({ message: 'Usuario no encontrado' });
+    }
+    
+    // Si se va a actualizar el email, verificar que no exista para otro usuario
+    if (email) {
+      const emailRequest = new sql.Request();
+      const checkEmail = await emailRequest
+        .input('email', sql.NVarChar, email)
+        .input('id', sql.Int, userId)
+        .query('SELECT COUNT(*) as count FROM Users WHERE Email = @email AND ID != @id');
+      
+      if (checkEmail.recordset[0].count > 0) {
+        return res.status(400).json({ message: 'El correo electrónico ya está registrado por otro usuario' });
+      }
+    }
+    
+    // Construir la consulta dinámica de actualización
+    let updateQuery = 'UPDATE Users SET ';
+    const queryParams = [];
+    
+    if (fullName) {
+      queryParams.push('FullName = @fullName');
+    }
+    
+    if (email) {
+      queryParams.push('Email = @email');
+    }
+    
+    if (phoneNumber !== undefined) {
+      queryParams.push('PhoneNumber = @phoneNumber');
+    }
+    
+    // Procesamos la contraseña por separado debido al hash
+    let hashedPassword = null;
+    if (password) {
+      const saltRounds = 10;
+      hashedPassword = await bcrypt.hash(password, saltRounds);
+      queryParams.push('Password = @password');
+    }
+    
+    updateQuery += queryParams.join(', ');
+    updateQuery += ' WHERE ID = @id';
+    
+    // Ejecutar la actualización
+    const updateRequest = new sql.Request();
+    updateRequest.input('id', sql.Int, userId);
+      
+    if (fullName) updateRequest.input('fullName', sql.NVarChar, fullName);
+    if (email) updateRequest.input('email', sql.NVarChar, email);
+    if (phoneNumber !== undefined) updateRequest.input('phoneNumber', sql.NVarChar, phoneNumber);
+    if (hashedPassword) updateRequest.input('password', sql.NVarChar, hashedPassword);
+    
+    await updateRequest.query(updateQuery);
+    
+    res.json({ message: 'Usuario actualizado exitosamente' });
+  } catch (err) {
+    console.error('Error al actualizar usuario:', err);
+    res.status(500).json({ message: 'Error al actualizar el usuario', error: err.message });
+  }
+});
+
+// DELETE - Eliminar un usuario
+app.delete('/users/:id', async (req, res) => {
+  try {
+    const userId = req.params.id;
+    
+    // Verificar si el usuario existe
+    const checkRequest = new sql.Request();
+    const checkUser = await checkRequest
+      .input('id', sql.Int, userId)
+      .query('SELECT COUNT(*) as count FROM Users WHERE ID = @id');
+    
+    if (checkUser.recordset[0].count === 0) {
+      return res.status(404).json({ message: 'Usuario no encontrado' });
+    }
+    
+    // Eliminar el usuario
+    const deleteRequest = new sql.Request();
+    await deleteRequest
+      .input('id', sql.Int, userId)
+      .query('DELETE FROM Users WHERE ID = @id');
+    
+    res.json({ message: 'Usuario eliminado exitosamente' });
+  } catch (err) {
+    console.error('Error al eliminar usuario:', err);
+    res.status(500).json({ message: 'Error al eliminar el usuario', error: err.message });
+  }
+});
+////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////
+
+
+
+
 
 // Iniciar servidor
 app.listen(PORT, async () => {
