@@ -6,7 +6,15 @@
     <title>Portal Cliente - AutoCare Rodriguez</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Puedes añadir estilos personalizados aquí si Tailwind no cubre algo */
+        .saving-indicator::after { content: '...'; display: inline-block; animation: dots 1s steps(5, end) infinite; }
+        @keyframes dots { 0%, 20% { content: '.'; } 40% { content: '..'; } 60%, 100% { content: '...'; } }
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
+         /* Clases para status */
+        .status-pending { background-color: #fef3c7; color: #92400e; } /* bg-yellow-100 text-yellow-800 */
+        .status-in_progress { background-color: #dbeafe; color: #1e40af; } /* bg-blue-100 text-blue-800 */
+        .status-completed { background-color: #d1fae5; color: #065f46; } /* bg-green-100 text-green-800 */
+        .status-cancelled { background-color: #fee2e2; color: #991b1b; } /* bg-red-100 text-red-800 */
+        .status-default { background-color: #f3f4f6; color: #1f2937; } /* bg-gray-100 text-gray-800 */
     </style>
 </head>
 <body class="bg-gray-50">
@@ -15,38 +23,44 @@
         <div class="flex items-center justify-between">
             <h1 class="text-2xl font-bold">AutoCare Rodriguez</h1>
             <div class="flex items-center space-x-4">
-                 <a href="#upcoming-section">
-                     <button class="px-4 py-2 rounded hover:bg-gray-700">Próximas Citas</button>
-                 </a>
-                 <a href="#history-section">
-                     <button class="px-4 py-2 rounded hover:bg-gray-700">Historial</button>
-                 </a>
-                 <button id="open-schedule-modal-btn" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                <span id="welcome-message" class="text-sm hidden"></span> <a href="#upcoming-section">
+                    <button class="px-4 py-2 rounded hover:bg-gray-700">Próximas Citas</button>
+                </a>
+                <a href="#history-section">
+                    <button class="px-4 py-2 rounded hover:bg-gray-700">Historial</button>
+                </a>
+                <button id="open-schedule-modal-btn" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
                     Agendar Cita
-                 </button>
-                 </div>
+                </button>
+                </div>
         </div>
     </nav>
 
     <div class="container mx-auto px-4 py-8">
+        <div id="api-error-message" class="mb-4 p-3 text-red-700 bg-red-100 border border-red-400 rounded hidden"></div>
+
         <section id="upcoming-section" class="mb-8">
              <h2 class="text-3xl font-semibold text-gray-800 mb-6">Mis Próximas Citas</h2>
-             <div id="upcoming-appointments-list" class="bg-white rounded-lg shadow p-6 space-y-4">
-                <p id="loading-upcoming" class="text-gray-500">Cargando citas...</p>
+            <div id="upcoming-appointments-list" class="bg-white rounded-lg shadow p-6 space-y-4 min-h-[100px] relative">
+                 <div id="loading-upcoming" class="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center hidden">
+                     <p class="text-gray-500">Cargando citas...</p>
                 </div>
-        </section>
+                 </div>
+         </section>
 
-        <section id="history-section" class="mb-8">
+         <section id="history-section" class="mb-8">
              <h2 class="text-3xl font-semibold text-gray-800 mb-6">Historial de Servicios</h2>
-            <div id="service-history-list" class="bg-white rounded-lg shadow p-6 space-y-4">
-                <p id="loading-history" class="text-gray-500">Cargando historial...</p>
+            <div id="service-history-list" class="bg-white rounded-lg shadow p-6 space-y-4 min-h-[100px] relative">
+                <div id="loading-history" class="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center hidden">
+                     <p class="text-gray-500">Cargando historial...</p>
                 </div>
-        </section>
-    </div>
+                </div>
+         </section>
+     </div>
 
-    <div id="scheduleModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white rounded-lg p-8 max-w-2xl w-full">
-            <div class="flex justify-between items-center mb-6">
+     <div id="scheduleModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto p-4">
+         <div class="bg-white rounded-lg p-8 max-w-2xl w-full m-auto">
+             <div class="flex justify-between items-center mb-6">
                 <h3 class="text-2xl font-semibold">Agendar Nueva Cita</h3>
                 <button id="close-schedule-modal-btn" class="text-gray-500 hover:text-gray-700">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
@@ -66,7 +80,7 @@
                 <div>
                     <label for="c-vehiculo" class="block text-sm font-medium text-gray-700 mb-1">Vehículo (Descripción)</label>
                     <input type="text" id="c-vehiculo" name="vehicleDescription" required class="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500" placeholder="Ej: Toyota Camry 2020 Azul">
-                     </div>
+                </div>
                 <div>
                     <label for="c-servicio" class="block text-sm font-medium text-gray-700 mb-1">Tipo de Servicio</label>
                     <select id="c-servicio" name="serviceType" required class="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500">
@@ -76,13 +90,14 @@
                         <option value="brake_service">Servicio de Frenos</option>
                         <option value="diagnostico">Diagnóstico General</option>
                         <option value="otro">Otro (detallar en notas)</option>
-                        </select>
+                    </select>
                 </div>
                 <div>
                     <label for="c-notas" class="block text-sm font-medium text-gray-700 mb-1">Notas Adicionales</label>
                     <textarea id="c-notas" name="notes" class="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500" rows="3" placeholder="Describe brevemente el problema o requerimiento..."></textarea>
                 </div>
-                <div id="schedule-form-feedback" class="text-red-600 text-sm mt-2"></div> <div class="flex justify-end space-x-4">
+                <div id="schedule-form-feedback" class="text-red-600 text-sm mt-2"></div>
+                <div class="flex justify-end space-x-4">
                     <button type="button" id="cancel-schedule-btn" class="px-6 py-2 border rounded-lg hover:bg-gray-100">Cancelar</button>
                     <button type="button" id="submit-schedule-btn" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
                         Agendar
@@ -94,212 +109,353 @@
 
     <footer class="bg-gray-800 text-white py-6 px-6 mt-8">
         <div class="container mx-auto text-center">
-            <p>&copy; <span id="current-year"></span> AutoCare Rodriguez. Todos los derechos reservados.</p>
+             <p>&copy; <span id="current-year"></span> AutoCare Rodriguez. Todos los derechos reservados.</p>
         </div>
     </footer>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // --- Modal Handling ---
-            const scheduleModal = document.getElementById('scheduleModal');
-            const openModalBtn = document.getElementById('open-schedule-modal-btn');
-            const closeModalBtn = document.getElementById('close-schedule-modal-btn');
-            const cancelModalBtn = document.getElementById('cancel-schedule-btn');
+            // --- CONFIGURACIÓN ---
+            const API_BASE_URL = 'http://localhost:3000'; // Ajusta si es necesario
 
+            // --- SIMULACIÓN DE USUARIO ACTUAL ---
+            // ¡¡¡ CAMBIA ESTOS VALORES POR UN USUARIO REAL DE TU BASE DE DATOS !!!
+            const CURRENT_USER_ID = 17; // ID del usuario logueado (simulado)
+            const CURRENT_USER_IDENTIFIER = '12@gmail.com'; // Email o Nombre Completo (simulado)
+            // --------------------------------------
+
+             // --- Elementos del DOM ---
+             const scheduleModal = document.getElementById('scheduleModal');
+             const openModalBtn = document.getElementById('open-schedule-modal-btn');
+             const closeModalBtn = document.getElementById('close-schedule-modal-btn');
+             const cancelModalBtn = document.getElementById('cancel-schedule-btn');
+             const scheduleForm = document.getElementById('schedule-form');
+             const submitScheduleBtn = document.getElementById('submit-schedule-btn');
+             const feedbackDiv = document.getElementById('schedule-form-feedback');
+             const upcomingListDiv = document.getElementById('upcoming-appointments-list');
+             const historyListDiv = document.getElementById('service-history-list');
+             const loadingUpcomingDiv = document.getElementById('loading-upcoming');
+             const loadingHistoryDiv = document.getElementById('loading-history');
+             const apiErrorMessageDiv = document.getElementById('api-error-message');
+             const welcomeMessageSpan = document.getElementById('welcome-message');
+
+
+            // --- Funciones Auxiliares ---
+            function showApiError(message) {
+                apiErrorMessageDiv.textContent = `Error: ${message}`;
+                apiErrorMessageDiv.classList.remove('hidden');
+                // Ocultar después de unos segundos
+                setTimeout(() => {
+                   hideApiError();
+                }, 5000);
+            }
+            function hideApiError() {
+                apiErrorMessageDiv.classList.add('hidden');
+                apiErrorMessageDiv.textContent = '';
+            }
+            // Función genérica para fetch (sin autenticación)
+             async function apiFetch(endpoint, options = {}) {
+                options.headers = {
+                    'Content-Type': 'application/json',
+                    ...options.headers,
+                };
+
+                try {
+                    const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
+                    hideApiError(); // Ocultar error previo
+
+                    if (!response.ok) {
+                        let errorData = { message: `Error HTTP ${response.status}: ${response.statusText}` };
+                        try {
+                            const jsonError = await response.json();
+                            errorData.message = jsonError.message || errorData.message; // Usar mensaje de API si existe
+                        } catch (e) { /* Ignorar si no hay cuerpo JSON */ }
+                        console.error(`API Error ${response.status}:`, errorData.message);
+                        showApiError(errorData.message);
+                        throw new Error(errorData.message);
+                    }
+
+                    if (response.status === 204) { // No Content
+                        return null;
+                    }
+                    return await response.json();
+                } catch (error) {
+                    if (!apiErrorMessageDiv.classList.contains('hidden')) {
+                         // Error ya mostrado por respuesta HTTP
+                    } else {
+                        console.error('Fetch/Network Error:', error);
+                        showApiError(error.message || 'Error de conexión con el servidor.');
+                    }
+                    throw error;
+                }
+            }
+             function setLoadingState(listDiv, loadingDiv, isLoading) {
+                 if (isLoading) {
+                     loadingDiv.classList.remove('hidden');
+                     listDiv.innerHTML = ''; // Limpiar contenido previo mientras carga
+                 } else {
+                     loadingDiv.classList.add('hidden');
+                 }
+             }
+             function getStatusClass(status) {
+                 switch (status?.toLowerCase()) {
+                     case 'pending': return 'status-pending';
+                     case 'in_progress': return 'status-in_progress';
+                     case 'completed': return 'status-completed';
+                     case 'cancelled': return 'status-cancelled';
+                     default: return 'status-default';
+                 }
+             }
+
+
+            // --- Modal Handling ---
             const showModal = () => scheduleModal.classList.remove('hidden');
             const hideModal = () => {
                  scheduleModal.classList.add('hidden');
-                 document.getElementById('schedule-form').reset(); // Limpiar form al cerrar
-                 document.getElementById('schedule-form-feedback').textContent = ''; // Limpiar feedback
+                 scheduleForm.reset();
+                 feedbackDiv.textContent = '';
             }
-
             openModalBtn.addEventListener('click', showModal);
             closeModalBtn.addEventListener('click', hideModal);
             cancelModalBtn.addEventListener('click', hideModal);
 
-            // --- Footer Year ---
-            document.getElementById('current-year').textContent = new Date().getFullYear();
 
-            // --- API Interaction Placeholder ---
-            const scheduleForm = document.getElementById('schedule-form');
-            const submitScheduleBtn = document.getElementById('submit-schedule-btn');
-            const feedbackDiv = document.getElementById('schedule-form-feedback');
+            // --- Carga y Renderizado de Citas ---
+            async function loadAppointments() {
+                 setLoadingState(upcomingListDiv, loadingUpcomingDiv, true);
+                 setLoadingState(historyListDiv, loadingHistoryDiv, true);
+                 hideApiError();
 
-            // Función para cargar citas (llamaría a tu API GET /api/appointments)
-            function loadAppointments() {
-                const upcomingList = document.getElementById('upcoming-appointments-list');
-                const historyList = document.getElementById('service-history-list');
-                const loadingUpcoming = document.getElementById('loading-upcoming');
-                const loadingHistory = document.getElementById('loading-history');
+                 try {
+                     // Pedimos TODAS las citas (la API actual no filtra por UserID en GET)
+                     const allAppointments = await apiFetch('/api/appointments');
 
-                // Simulación: Aquí harías fetch('/api/appointments') para obtener las citas del usuario
-                console.log("Intentando cargar citas desde la API...");
-                // fetch('/api/appointments') // Ruta de ejemplo para citas del usuario logueado
-                //  .then(response => response.json())
-                //  .then(data => {
-                //      loadingUpcoming.style.display = 'none';
-                //      loadingHistory.style.display = 'none';
-                //      upcomingList.innerHTML = ''; // Limpiar antes de añadir
-                //      historyList.innerHTML = ''; // Limpiar antes de añadir
-                //      if (data.upcoming && data.upcoming.length > 0) {
-                //          data.upcoming.forEach(renderAppointmentItem);
-                //      } else {
-                //          upcomingList.innerHTML = '<p class="text-gray-500">No tienes citas próximas.</p>';
-                //      }
-                //      if (data.history && data.history.length > 0) {
-                //          data.history.forEach(renderHistoryItem);
-                //      } else {
-                //          historyList.innerHTML = '<p class="text-gray-500">No tienes historial de servicios.</p>';
-                //      }
-                //  })
-                //  .catch(error => {
-                //      console.error('Error cargando citas:', error);
-                //      upcomingList.innerHTML = '<p class="text-red-500">Error al cargar citas.</p>';
-                //      historyList.innerHTML = '<p class="text-red-500">Error al cargar historial.</p>';
-                //  });
+                    // Filtramos las citas del USUARIO ACTUAL (simulado) en el frontend
+                    const userAppointments = allAppointments.filter(app => app.UserID === CURRENT_USER_ID);
 
-                // Mientras tanto, quitamos el "cargando" después de un tiempo (solo para demo)
-                 setTimeout(() => {
-                    if(loadingUpcoming) loadingUpcoming.style.display = 'none';
-                    if(loadingHistory) loadingHistory.style.display = 'none';
-                    // Añadir mensajes si no hay datos (simulado)
-                    if (!upcomingList.querySelector('.appointment-item')) {
-                         upcomingList.innerHTML = '<p class="text-gray-500">No tienes citas próximas.</p>';
-                    }
-                     if (!historyList.querySelector('.history-item')) {
-                         historyList.innerHTML = '<p class="text-gray-500">No tienes historial de servicios.</p>';
+                    // Separamos en próximas e historial
+                    const upcoming = [];
+                    const history = [];
+                    const now = new Date();
+
+                    userAppointments.forEach(app => {
+                        const appDate = new Date(app.AppointmentDateTime);
+                        // Considerar Próximas si no están canceladas o completadas (y son futuras o recientes)
+                        if ((app.Status === 'pending' || app.Status === 'in_progress') && appDate >= now) {
+                           upcoming.push(app);
+                        } else { // El resto va al historial
+                            history.push(app);
+                        }
+                    });
+
+                     // Ordenar: Próximas por fecha ascendente, Historial por fecha descendente
+                    upcoming.sort((a, b) => new Date(a.AppointmentDateTime) - new Date(b.AppointmentDateTime));
+                    history.sort((a, b) => new Date(b.AppointmentDateTime) - new Date(a.AppointmentDateTime));
+
+
+                     // Renderizar
+                     setLoadingState(upcomingListDiv, loadingUpcomingDiv, false);
+                     upcomingListDiv.innerHTML = ''; // Limpiar por si acaso
+                     if (upcoming.length > 0) {
+                         upcoming.forEach(renderUpcomingAppointmentItem);
+                     } else {
+                         upcomingListDiv.innerHTML = '<p class="text-gray-500 text-center py-4">No tienes citas próximas.</p>';
                      }
-                 }, 1500); // Simula carga
+
+                     setLoadingState(historyListDiv, loadingHistoryDiv, false);
+                     historyListDiv.innerHTML = ''; // Limpiar por si acaso
+                     if (history.length > 0) {
+                         history.forEach(renderHistoryItem);
+                     } else {
+                         historyListDiv.innerHTML = '<p class="text-gray-500 text-center py-4">No tienes historial de servicios.</p>';
+                     }
+
+                 } catch (error) {
+                    console.error('Error cargando citas:', error);
+                    // Mostrar error en ambas secciones si falla la carga
+                    setLoadingState(upcomingListDiv, loadingUpcomingDiv, false);
+                    setLoadingState(historyListDiv, loadingHistoryDiv, false);
+                    if (!apiErrorMessageDiv.classList.contains('hidden')) {
+                         // El error ya se está mostrando globalmente
+                         upcomingListDiv.innerHTML = '<p class="text-red-500 text-center py-4">Error al cargar. Intente más tarde.</p>';
+                         historyListDiv.innerHTML = '<p class="text-red-500 text-center py-4">Error al cargar. Intente más tarde.</p>';
+                    }
+                    // Si no se mostró, el error se maneja en apiFetch
+                 }
             }
 
-             // Funciones para renderizar items (ejemplos, adaptar a tu estructura de datos)
-             function renderAppointmentItem(appointment) {
-                 const list = document.getElementById('upcoming-appointments-list');
+             function renderUpcomingAppointmentItem(appointment) {
+                 const localDateTime = new Date(appointment.AppointmentDateTime).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' });
+                 const statusClass = getStatusClass(appointment.Status);
+                 const statusText = appointment.Status.replace('_', ' '); // "in progress"
+
                  const itemHTML = `
-                    <div class="border rounded-lg p-4 appointment-item" data-appointment-id="${appointment.AppointmentID}">
-                        <div class="flex justify-between items-center">
-                            <span class="text-sm font-medium appointment-datetime">${new Date(appointment.AppointmentDateTime).toLocaleString()}</span>
-                            <span class="px-2 py-1 ${getStatusClass(appointment.Status)} rounded-full text-sm appointment-status">${appointment.Status}</span>
-                        </div>
-                        <p class="text-gray-600 mt-2 appointment-details">${appointment.ServiceType} - ${appointment.VehicleDescription}</p>
-                        <div class="mt-3 flex space-x-2">
-                            <button class="text-blue-600 hover:text-blue-800 text-sm modify-btn">Modificar</button>
-                            <button class="text-red-600 hover:text-red-800 text-sm cancel-btn">Cancelar</button>
-                        </div>
-                    </div>`;
-                 list.insertAdjacentHTML('beforeend', itemHTML);
+                     <div class="border rounded-lg p-4 appointment-item" data-appointment-id="${appointment.AppointmentID}">
+                         <div class="flex justify-between items-center flex-wrap gap-2">
+                             <span class="font-medium appointment-datetime">${localDateTime}</span>
+                             <span class="px-2 py-1 ${statusClass} rounded-full text-xs font-semibold uppercase tracking-wide appointment-status">${statusText}</span>
+                         </div>
+                         <p class="text-gray-700 mt-2 appointment-details">
+                             <span class="font-semibold">Servicio:</span> ${appointment.ServiceType} <br>
+                             <span class="font-semibold">Vehículo:</span> ${appointment.VehicleDescription}
+                         </p>
+                         ${appointment.Notes ? `<p class="text-sm text-gray-500 mt-1">Notas Cliente: ${appointment.Notes}</p>` : ''}
+                         <div class="mt-3 flex space-x-3">
+                             ${appointment.Status === 'pending' || appointment.Status === 'in_progress' ?
+                             `<button class="text-red-600 hover:text-red-800 text-sm font-medium cancel-btn">Cancelar Cita</button>` : ''
+                             }
+                         </div>
+                     </div>`;
+                 upcomingListDiv.insertAdjacentHTML('beforeend', itemHTML);
              }
 
              function renderHistoryItem(appointment) {
-                 const list = document.getElementById('service-history-list');
-                  const itemHTML = `
-                    <div class="border rounded-lg p-4 history-item" data-appointment-id="${appointment.AppointmentID}">
-                        <div class="flex justify-between items-center">
-                            <span class="text-sm font-medium history-datetime">${new Date(appointment.AppointmentDateTime).toLocaleDateString()}</span>
-                            <span class="px-2 py-1 ${getStatusClass(appointment.Status)} rounded-full text-sm history-status">${appointment.Status}</span>
-                        </div>
-                        <p class="text-gray-600 mt-2 history-details">${appointment.ServiceType} - ${appointment.VehicleDescription}</p>
-                        <p class="text-sm text-gray-500 mt-2 history-notes">Notas: ${appointment.Notes || 'N/A'}</p>
-                    </div>`;
-                 list.insertAdjacentHTML('beforeend', itemHTML);
-             }
+                 const localDate = new Date(appointment.AppointmentDateTime).toLocaleDateString('es-MX', { dateStyle: 'long' });
+                 const statusClass = getStatusClass(appointment.Status);
+                 const statusText = appointment.Status.replace('_', ' ');
 
-             function getStatusClass(status) {
-                 switch (status?.toLowerCase()) {
-                     case 'pending': return 'bg-yellow-100 text-yellow-800';
-                     case 'in_progress': return 'bg-blue-100 text-blue-800';
-                     case 'completed': return 'bg-green-100 text-green-800';
-                     case 'cancelled': return 'bg-red-100 text-red-800';
-                     default: return 'bg-gray-100 text-gray-800';
-                 }
+                 const itemHTML = `
+                     <div class="border rounded-lg p-4 history-item opacity-90" data-appointment-id="${appointment.AppointmentID}">
+                         <div class="flex justify-between items-center flex-wrap gap-2">
+                             <span class="font-medium history-datetime">${localDate}</span>
+                             <span class="px-2 py-1 ${statusClass} rounded-full text-xs font-semibold uppercase tracking-wide history-status">${statusText}</span>
+                         </div>
+                         <p class="text-gray-700 mt-2 history-details">
+                              <span class="font-semibold">Servicio:</span> ${appointment.ServiceType} <br>
+                             <span class="font-semibold">Vehículo:</span> ${appointment.VehicleDescription}
+                         </p>
+                          ${appointment.Notes ? `<p class="text-sm text-gray-500 mt-1">Notas Cliente: ${appointment.Notes}</p>` : ''}
+                         </div>`;
+                 historyListDiv.insertAdjacentHTML('beforeend', itemHTML);
              }
 
 
-            // Listener para el botón de agendar (manejo de formulario con fetch)
-            submitScheduleBtn.addEventListener('click', () => {
-                feedbackDiv.textContent = ''; // Limpiar feedback previo
-                const formData = new FormData(scheduleForm);
-                const data = {
-                    // Combina fecha y hora para AppointmentDateTime
-                    appointmentDateTime: `${formData.get('appointmentDate')}T${formData.get('appointmentTime')}:00`,
-                    vehicleDescription: formData.get('vehicleDescription'),
-                    serviceType: formData.get('serviceType'),
-                    notes: formData.get('notes') || null // Enviar null si está vacío
-                };
+            // --- Agendar Cita ---
+             submitScheduleBtn.addEventListener('click', async () => {
+                 feedbackDiv.textContent = '';
+                 hideApiError();
+                 const formData = new FormData(scheduleForm);
 
-                // Validación básica de cliente
-                if (!data.appointmentDateTime.includes('T') || !data.vehicleDescription || !data.serviceType) {
-                    feedbackDiv.textContent = 'Por favor, complete todos los campos requeridos (Fecha, Hora, Vehículo, Servicio).';
-                    return;
-                }
+                 // Validar y combinar fecha/hora
+                 const dateValue = formData.get('appointmentDate');
+                 const timeValue = formData.get('appointmentTime');
+                 let combinedDateTimeISO = null;
+                 if (dateValue && timeValue) {
+                     // Intentar crear fecha en UTC para consistencia
+                     const dateObj = new Date(`${dateValue}T${timeValue}:00`);
+                     if (!isNaN(dateObj.getTime())) {
+                        // Comparar con la fecha actual para evitar agendar en el pasado
+                        const now = new Date();
+                        // Quitar segundos/milisegundos para comparación más justa
+                        now.setSeconds(0, 0);
+                        dateObj.setSeconds(0,0);
 
-                console.log('Enviando datos a la API:', data);
-                 submitScheduleBtn.disabled = true; // Deshabilitar botón mientras se envía
-                 submitScheduleBtn.textContent = 'Agendando...';
-
-                // Aquí harías la llamada POST a tu API
-                // fetch('/api/appointments', {
-                //     method: 'POST',
-                //     headers: {
-                //         'Content-Type': 'application/json',
-                //         // Aquí iría el token de autenticación si es necesario
-                //         // 'Authorization': `Bearer ${your_auth_token}`
-                //     },
-                //     body: JSON.stringify(data)
-                // })
-                // .then(response => {
-                //     if (!response.ok) {
-                //         // Si la API devuelve un error, intenta leer el mensaje
-                //         return response.json().then(err => { throw new Error(err.message || 'Error al agendar cita') });
-                //     }
-                //     return response.json();
-                // })
-                // .then(newAppointment => {
-                //     console.log('Cita agendada:', newAppointment);
-                //     hideModal(); // Cerrar modal si fue exitoso
-                //     loadAppointments(); // Recargar la lista de citas
-                //     // Podrías mostrar un mensaje de éxito global
-                // })
-                // .catch(error => {
-                //     console.error('Error en el formulario:', error);
-                //     feedbackDiv.textContent = `Error: ${error.message}`;
-                // })
-                // .finally(() => {
-                //      submitScheduleBtn.disabled = false; // Rehabilitar botón
-                //      submitScheduleBtn.textContent = 'Agendar';
-                // });
-
-                 // Simulación de éxito después de 1 segundo
-                 setTimeout(() => {
-                     console.log('Simulación: Cita agendada');
-                     hideModal();
-                     loadAppointments(); // Simula recarga
-                     alert('¡Cita agendada con éxito! (Simulación)'); // Mensaje simple de éxito
-                     submitScheduleBtn.disabled = false;
-                     submitScheduleBtn.textContent = 'Agendar';
-                 }, 1000);
-            });
-
-            // Cargar citas iniciales al cargar la página
-            loadAppointments();
-
-             // Placeholder para listeners de botones Modificar/Cancelar (requieren API)
-             document.getElementById('upcoming-appointments-list').addEventListener('click', (event) => {
-                 if (event.target.classList.contains('modify-btn')) {
-                     const appointmentId = event.target.closest('.appointment-item').dataset.appointmentId;
-                     console.log(`Modificar cita ID: ${appointmentId} (Implementar lógica y modal de modificación)`);
-                     alert(`Funcionalidad Modificar para ID ${appointmentId} no implementada.`);
-                 } else if (event.target.classList.contains('cancel-btn')) {
-                     const appointmentId = event.target.closest('.appointment-item').dataset.appointmentId;
-                     console.log(`Cancelar cita ID: ${appointmentId}`);
-                     if (confirm(`¿Está seguro que desea cancelar la cita ID ${appointmentId}?`)) {
-                         // Aquí harías fetch('/api/appointments/' + appointmentId, { method: 'DELETE' or 'PATCH' para cambiar status a 'cancelled' })
-                         console.log(`Llamada API para cancelar cita ID: ${appointmentId}`);
-                         alert(`Funcionalidad Cancelar para ID ${appointmentId} no implementada (API Call pendiente).`);
-                         // .then(() => loadAppointments()); // Recargar lista después de cancelar
+                        if (dateObj < now) {
+                            feedbackDiv.textContent = 'No puedes agendar citas en el pasado.';
+                            return;
+                        }
+                         combinedDateTimeISO = dateObj.toISOString();
+                     } else {
+                        feedbackDiv.textContent = 'Fecha u hora inválida.';
+                        return;
                      }
                  }
+
+                 const data = {
+                     clientIdentifier: CURRENT_USER_IDENTIFIER, // <- Identificador del usuario simulado
+                     appointmentDateTime: combinedDateTimeISO,
+                     vehicleDescription: formData.get('vehicleDescription'),
+                     serviceType: formData.get('serviceType'),
+                     notes: formData.get('notes') || null,
+                     status: 'pending' // <- El cliente siempre agenda como pendiente
+                 };
+
+                // Validación básica de campos requeridos
+                 if (!data.appointmentDateTime || !data.vehicleDescription || !data.serviceType || !data.clientIdentifier) {
+                     feedbackDiv.textContent = 'Por favor, complete Fecha, Hora, Vehículo y Servicio.';
+                     return;
+                 }
+
+                 console.log('Enviando datos a POST /api/appointments:', data);
+                 submitScheduleBtn.disabled = true;
+                 submitScheduleBtn.classList.add('saving-indicator');
+                 submitScheduleBtn.textContent = 'Agendando';
+
+                 try {
+                     const newAppointment = await apiFetch('/api/appointments', {
+                         method: 'POST',
+                         body: JSON.stringify(data)
+                     });
+                     console.log('Cita agendada:', newAppointment);
+                     hideModal();
+                     loadAppointments(); // Recargar lista
+                     alert('¡Cita agendada con éxito!');
+
+                 } catch (error) {
+                     // El error ya se mostró por apiFetch o validación previa
+                      if (!feedbackDiv.textContent && apiErrorMessageDiv.textContent) {
+                         feedbackDiv.textContent = apiErrorMessageDiv.textContent;
+                     } else if (!feedbackDiv.textContent) {
+                         feedbackDiv.textContent = `Error: ${error.message || 'Error desconocido al agendar.'}`;
+                     }
+                 } finally {
+                     submitScheduleBtn.disabled = false;
+                     submitScheduleBtn.classList.remove('saving-indicator');
+                     submitScheduleBtn.textContent = 'Agendar';
+                 }
              });
+
+            // --- Cancelar Cita ---
+             upcomingListDiv.addEventListener('click', async (event) => {
+                 if (event.target.classList.contains('cancel-btn')) {
+                     const button = event.target;
+                     const appointmentItem = button.closest('.appointment-item');
+                     const appointmentId = appointmentItem?.dataset.appointmentId;
+
+                     if (!appointmentId) return;
+
+                     if (confirm(`¿Está seguro que desea cancelar esta cita?`)) {
+                         button.disabled = true;
+                         button.textContent = 'Cancelando...';
+                         hideApiError();
+
+                         try {
+                             // Opción 1: Cambiar estado a 'cancelled' (si quieres mantener registro)
+                              await apiFetch(`/api/appointments/${appointmentId}/status`, {
+                                  method: 'PATCH',
+                                  body: JSON.stringify({ status: 'cancelled' })
+                              });
+                             console.log(`Cita ${appointmentId} marcada como cancelada.`);
+                              alert('Cita cancelada.');
+
+                             // Opción 2: Eliminar completamente (Descomenta si prefieres esto)
+                             // await apiFetch(`/api/appointments/${appointmentId}`, { method: 'DELETE' });
+                             // console.log(`Cita ${appointmentId} eliminada.`);
+                             // alert('Cita eliminada.');
+
+                             loadAppointments(); // Recargar listas
+
+                         } catch (error) {
+                             console.error(`Error al cancelar cita ${appointmentId}:`, error);
+                             button.disabled = false; // Habilitar botón de nuevo si falla
+                             button.textContent = 'Cancelar Cita';
+                             // El error global ya lo muestra apiFetch
+                         }
+                     }
+                 }
+                 // Placeholder para Modificar
+                 // else if (event.target.classList.contains('modify-btn')) { ... }
+            });
+
+            // --- Inicialización ---
+            document.getElementById('current-year').textContent = new Date().getFullYear();
+             // Muestra mensaje de bienvenida simulado
+             if (CURRENT_USER_IDENTIFIER) {
+                 welcomeMessageSpan.textContent = `Bienvenido, ${CURRENT_USER_IDENTIFIER}!`;
+                 welcomeMessageSpan.classList.remove('hidden');
+             }
+             loadAppointments(); // Carga inicial
+
         });
     </script>
 
