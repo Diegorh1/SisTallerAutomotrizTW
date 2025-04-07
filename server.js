@@ -999,15 +999,6 @@ app.post('/api/feedback', async (req, res) => {
 //  INICIO - BLOQUE COMPLETO Y CORREGIDO DE RUTAS API PARA BILLING (server.js)
 // =======================================================================
 
-// Asegúrate de tener estas líneas al principio de tu server.js si no están ya
-const express = require("express");
-const sql = require("mssql");
-const cors = require("cors");
-const bodyParser = require("body-parser");
-const PDFDocument = require('pdfkit'); // NECESITAS: npm install pdfkit
-
-// Asume que 'app' y 'pool' ya están definidos e inicializados correctamente antes de estas rutas.
-
 // --- Rutas de Catálogo de Servicios ---
 app.get('/api/services', async (req, res) => {
     // #swagger.tags = ['Services']
@@ -1043,39 +1034,7 @@ app.get('/api/users', async (req, res) => {
 });
 
 // --- Rutas de Citas (Dependencia para Facturación) ---
-app.get('/api/appointments', async (req, res) => {
-    // #swagger.tags = ['Appointments']
-    // #swagger.summary = '(Dependencia Billing) Obtener citas, opcionalmente filtradas por usuario y estado'
-    if (!pool) { return res.status(500).json({ message: "Error DB" }); }
-    const { status, userId } = req.query;
 
-    try {
-        let query = `
-            SELECT A.*, U.FullName AS ClientFullName,
-                   SF.FeedbackID, SF.Rating AS FeedbackRating, SF.Comments AS FeedbackComments, SF.SubmittedAt AS FeedbackSubmittedAt
-            FROM Appointments A
-            LEFT JOIN Users U ON A.UserID = U.ID
-            LEFT JOIN ServiceFeedback SF ON A.AppointmentID = SF.AppointmentID
-            WHERE 1=1`;
-        const request = pool.request();
-        const conditions = [];
-        if (status) { conditions.push("A.Status = @Status"); request.input('Status', sql.NVarChar, status); }
-        if (userId && !isNaN(parseInt(userId))) { conditions.push("A.UserID = @UserID"); request.input('UserID', sql.Int, parseInt(userId)); }
-        if (conditions.length > 0) { query += " AND " + conditions.join(" AND "); }
-        query += " ORDER BY A.AppointmentDateTime DESC;";
-
-        const result = await request.query(query);
-        const appointments = result.recordset.map(app => ({
-            ...(({ ClientFullName, FeedbackID, FeedbackRating, FeedbackComments, FeedbackSubmittedAt, ...rest }) => rest)(app)), // Copia segura
-            User: { FullName: app.ClientFullName },
-            Feedback: app.FeedbackID ? { FeedbackID: app.FeedbackID, Rating: app.FeedbackRating, Comments: app.FeedbackComments, SubmittedAt: app.FeedbackSubmittedAt } : null
-        }));
-        res.json(appointments);
-    } catch (error) {
-        console.error("Error en GET /api/appointments:", error.message);
-        res.status(500).json({ message: "Error interno al obtener citas." });
-    }
-});
 
 
 // --- Rutas de Facturación (Invoices & Billing) ---
