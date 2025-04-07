@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mis Facturas - AutoCare Rodriguez</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style> /* Estilos personalizados si los necesitas */ </style>
+</head>
+<body class="bg-gray-50">
+     <nav class="bg-gray-800 text-white px-6 py-4">
+        <div class="flex items-center justify-between">
+            <h1 class="text-2xl font-bold">AutoCare Rodriguez</h1>
+            <div class="flex items-center space-x-4">
+                <span id="welcome-message-client" class="text-sm hidden"></span>
+                 <a href="/portal_cliente.html#upcoming-section"> <button class="px-4 py-2 rounded hover:bg-gray-700">Citas</button> </a>
+                <a href="/portal_cliente.html#history-section"> <button class="px-4 py-2 rounded hover:bg-gray-700">Historial</button> </a>
+                 <a href="client_billing.html"> <button class="px-4 py-2 rounded bg-gray-700">Mis Facturas</button> </a> </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto px-4 py-6"> <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">Mis Facturas</h2>
+
+             <div id="api-error-message-client" class="mb-4 p-3 text-red-700 bg-red-100 border border-red-400 rounded hidden"></div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Factura #</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Servicio Principal</th> <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Monto</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="client-invoices-table-body" class="divide-y divide-gray-200">
+                        <tr id="loading-client-invoices-row">
+                            <td colspan="6" class="text-center py-4 text-gray-500">Cargando tus facturas...</td>
+                        </tr>
+                       </tbody>
+                </table>
+                 <div id="no-client-invoices" class="text-center py-4 text-gray-500 hidden">No tienes facturas registradas.</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="paymentModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-8 max-w-md w-full">
+             <div class="flex justify-between items-center mb-4">
+                 <h3 class="text-xl font-semibold">Realizar Pago</h3>
+                  <button id="close-payment-modal-btn" type="button" class="text-gray-400 hover:text-gray-600">
+                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                 </button>
+             </div>
+            <form id="payment-form" class="space-y-4">
+                <input type="hidden" id="payment-invoice-id">
+                <p class="text-sm">Factura: <span id="payment-invoice-number" class="font-medium"></span></p>
+                <div>
+                    <label for="payment-method" class="block text-sm font-medium mb-1">Método de Pago</label>
+                    <select id="payment-method" name="paymentMethod" class="w-full px-4 py-2 border rounded-lg">
+                        <option value="Credit Card">Tarjeta de Crédito (Simulado)</option>
+                        <option value="PayPal">PayPal (Simulado)</option>
+                        <option value="Cash">Efectivo en Taller (Marcar como Pagado)</option>
+                    </select>
+                </div>
+                <div class="border-t pt-4">
+                    <div class="flex justify-between text-lg font-semibold">
+                        <span>Monto a Pagar:</span>
+                        <span id="payment-amount">$0.00</span>
+                    </div>
+                </div>
+                 <div id="payment-form-feedback" class="text-red-600 text-sm mt-2"></div>
+                <div class="flex justify-end space-x-4">
+                    <button type="button" id="cancel-payment-btn" class="px-4 py-2 border rounded-lg hover:bg-gray-100">Cancelar</button>
+                    <button type="button" id="submit-payment-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Pagar Ahora</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <footer class="bg-gray-800 text-white py-6 px-6 mt-8">
+        <div class="container mx-auto text-center">
+            <p>&copy; <span id="current-year-client-billing"></span> AutoCare Rodriguez. All rights reserved.</p>
+        </div>
+    </footer>
+
+     <script>
+         // --- Funciones básicas para Modales ---
+         function showModal(modalId) { document.getElementById(modalId)?.classList.remove('hidden'); }
+         function hideModal(modalId) { document.getElementById(modalId)?.classList.add('hidden'); }
+
+        document.addEventListener('DOMContentLoaded', () => {
+             // --- Configuración y Simulación Usuario ---
+             const API_BASE_URL = 'http://localhost:3000';
+             // ¡¡¡ CAMBIA ESTOS VALORES POR UN USUARIO REAL DE TU BASE DE DATOS !!!
+             const CURRENT_USER_ID = 17; // ID del usuario (ej: 1, 2, etc.)
+             const CURRENT_USER_IDENTIFIER = '12@gmail.com'; // Email o Nombre Completo
+             // --------------------------------------
+
+             // --- Elementos DOM ---
+             const clientInvoicesTableBody = document.getElementById('client-invoices-table-body');
+             const loadingClientInvoicesRow = document.getElementById('loading-client-invoices-row');
+             const noClientInvoicesDiv = document.getElementById('no-client-invoices');
+             const apiErrorMessageDivClient = document.getElementById('api-error-message-client');
+             const welcomeMessageSpanClient = document.getElementById('welcome-message-client');
+             // Modal Pago
+             const paymentModal = document.getElementById('paymentModal');
+             const closePaymentModalBtn = document.getElementById('close-payment-modal-btn');
+             const cancelPaymentBtn = document.getElementById('cancel-payment-btn');
+             const paymentForm = document.getElementById('payment-form');
+             const submitPaymentBtn = document.getElementById('submit-payment-btn');
+             const paymentInvoiceIdInput = document.getElementById('payment-invoice-id');
+             const paymentInvoiceNumberSpan = document.getElementById('payment-invoice-number');
+             const paymentAmountSpan = document.getElementById('payment-amount');
+             const paymentMethodSelect = document.getElementById('payment-method');
+             const paymentFormFeedbackDiv = document.getElementById('payment-form-feedback');
+
+             // --- Funciones Auxiliares ---
+             function showApiErrorClient(message) {
+                 apiErrorMessageDivClient.textContent = `Error: ${message}`;
+                 apiErrorMessageDivClient.classList.remove('hidden');
+                 setTimeout(() => hideApiErrorClient(), 5000);
+             }
+             function hideApiErrorClient() {
+                 apiErrorMessageDivClient.classList.add('hidden');
+                 apiErrorMessageDivClient.textContent = '';
+             }
+             async function apiFetchClient(endpoint, options = {}) {
+                 options.headers = { 'Content-Type': 'application/json', ...options.headers };
+                 try {
+                     const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
+                     hideApiErrorClient();
+                     if (!response.ok) {
+                        let errorData = { message: `Error HTTP ${response.status}: ${response.statusText}` };
+                        try { errorData.message = (await response.json()).message || errorData.message; } catch (e) {}
+                        throw new Error(errorData.message);
+                     }
+                     return response.status === 204 ? null : await response.json();
+                 } catch (error) {
+                     console.error('API Fetch Error (Client):', error);
+                     showApiErrorClient(error.message || 'Error de conexión.');
+                     throw error;
+                 }
+             }
+
+             // --- Lógica Principal ---
+
+             // Cargar Facturas del Cliente
+             async function loadClientInvoices() {
+                 loadingClientInvoicesRow.style.display = '';
+                 noClientInvoicesDiv.classList.add('hidden');
+                 clientInvoicesTableBody.innerHTML = ''; clientInvoicesTableBody.appendChild(loadingClientInvoicesRow);
+                 hideApiErrorClient();
+
+                 try {
+                     // **NECESITAS API ENDPOINT:** ej. GET /api/invoices?userId={CURRENT_USER_ID}
+                     // const invoices = await apiFetchClient(`/api/invoices?userId=${CURRENT_USER_ID}`);
+                     // Simulación:
+                     await new Promise(r => setTimeout(r, 500));
+                     const invoices = [
+                         { InvoiceID: 102, UserID: CURRENT_USER_ID, ServiceDescription: "Revisión General", InvoiceDate: new Date().toISOString(), TotalAmount: 85.50, Status: 'pending' },
+                         { InvoiceID: 95, UserID: CURRENT_USER_ID, ServiceDescription: "Cambio Llantas", InvoiceDate: new Date(Date.now() - 86400000*15).toISOString(), TotalAmount: 450.00, Status: 'paid' }
+                     ].filter(inv => inv.UserID === CURRENT_USER_ID); // Simular filtro
+
+                     loadingClientInvoicesRow.style.display = 'none';
+                     if (invoices && invoices.length > 0) {
+                         clientInvoicesTableBody.innerHTML = '';
+                         invoices.forEach(renderClientInvoiceRow);
+                     } else {
+                         clientInvoicesTableBody.innerHTML = '';
+                         noClientInvoicesDiv.classList.remove('hidden');
+                     }
+
+                 } catch (error) {
+                    loadingClientInvoicesRow.style.display = 'none';
+                    clientInvoicesTableBody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-red-500">Error al cargar tus facturas.</td></tr>`;
+                 }
+             }
+
+             // Renderizar Fila de Factura Cliente
+             function renderClientInvoiceRow(invoice) {
+                 const invoiceNumber = `#INV-${String(invoice.InvoiceID).padStart(3, '0')}`;
+                 const invoiceDate = new Date(invoice.InvoiceDate).toLocaleDateString('es-MX', {dateStyle: 'short'});
+                 let statusHTML = '';
+                 // Simplificado - Asume que hay una descripción principal o toma el primer item
+                 const serviceDescription = invoice.ServiceDescription || invoice.items?.[0]?.description || 'Varios Servicios';
+
+                 switch(invoice.Status) {
+                    case 'paid': statusHTML = '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Pagada</span>'; break;
+                    case 'pending': statusHTML = '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">Pendiente</span>'; break;
+                    case 'overdue': statusHTML = '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Vencida</span>'; break;
+                    case 'cancelled': statusHTML = '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">Anulada</span>'; break;
+                    default: statusHTML = `<span class="text-xs">${invoice.Status}</span>`;
+                 }
+
+                 const rowHTML = `
+                     <tr class="hover:bg-gray-50" data-invoice-id="${invoice.InvoiceID}" data-amount="${invoice.TotalAmount.toFixed(2)}" data-number="${invoiceNumber}">
+                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${invoiceNumber}</td>
+                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${serviceDescription}</td>
+                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${invoiceDate}</td>
+                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">$${invoice.TotalAmount.toFixed(2)}</td>
+                         <td class="px-6 py-4 whitespace-nowrap">${statusHTML}</td>
+                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                             ${invoice.Status === 'pending' || invoice.Status === 'overdue' ?
+                             `<button class="text-blue-600 hover:text-blue-800 mr-3 pay-invoice-btn">Pagar Ahora</button>` : ''
+                             }
+                             <button class="text-gray-600 hover:text-gray-800 download-invoice-btn">Descargar</button>
+                         </td>
+                     </tr>`;
+                 clientInvoicesTableBody.insertAdjacentHTML('beforeend', rowHTML);
+             }
+
+             // Abrir Modal de Pago
+             clientInvoicesTableBody.addEventListener('click', (e) => {
+                 if (e.target.classList.contains('pay-invoice-btn')) {
+                     const row = e.target.closest('tr');
+                     const invoiceId = row.dataset.invoiceId;
+                     const amount = row.dataset.amount;
+                     const number = row.dataset.number;
+
+                     paymentInvoiceIdInput.value = invoiceId;
+                     paymentInvoiceNumberSpan.textContent = number;
+                     paymentAmountSpan.textContent = `$${amount}`;
+                     paymentFormFeedbackDiv.textContent = ''; // Limpiar errores previos
+                     paymentForm.reset(); // Resetear método de pago
+
+                     showModal('paymentModal');
+                 }
+                 // TODO: Listener para botón Descargar
+                 else if (e.target.classList.contains('download-invoice-btn')) {
+                     const row = e.target.closest('tr');
+                     const invoiceId = row.dataset.invoiceId;
+                     alert(`Funcionalidad Descargar Factura #${invoiceId} no implementada.`);
+                     // Aquí podrías llamar a una API GET /api/invoices/{invoiceId}/pdf o generar PDF en cliente
+                 }
+             });
+
+             // Cerrar Modal de Pago
+             closePaymentModalBtn?.addEventListener('click', () => hideModal('paymentModal'));
+             cancelPaymentBtn?.addEventListener('click', () => hideModal('paymentModal'));
+
+            // Simular/Procesar Pago
+            submitPaymentBtn?.addEventListener('click', async () => {
+                 const invoiceId = paymentInvoiceIdInput.value;
+                 const paymentMethod = paymentMethodSelect.value;
+                 const amount = parseFloat(paymentAmountSpan.textContent.replace('$', ''));
+
+                 if (!invoiceId) return;
+
+                 paymentFormFeedbackDiv.textContent = '';
+                 submitPaymentBtn.disabled = true;
+                 submitPaymentBtn.textContent = 'Procesando...';
+
+                 console.log(`Intentando pagar factura ${invoiceId}, monto ${amount}, método ${paymentMethod}`);
+
+                 try {
+                     // **NECESITAS API ENDPOINT:** ej. POST /api/payments o PATCH /api/invoices/{id}/status
+                     // await apiFetchClient('/api/payments', {
+                     //     method: 'POST',
+                     //     body: JSON.stringify({ invoiceId: parseInt(invoiceId), amount, paymentMethod })
+                     // });
+                     // O marcar como pagada:
+                     // await apiFetchClient(`/api/invoices/${invoiceId}/status`, {
+                     //     method: 'PATCH',
+                     //     body: JSON.stringify({ status: 'paid' })
+                     // });
+
+                     // Simulación:
+                     await new Promise(r => setTimeout(r, 1500));
+                     console.log(`Pago simulado para factura ${invoiceId}`);
+
+                     hideModal('paymentModal');
+                     alert('Pago procesado con éxito (Simulación). Tu factura se marcará como pagada.');
+                     loadClientInvoices(); // Recargar la lista
+
+                 } catch (error) {
+                    paymentFormFeedbackDiv.textContent = `Error: ${error.message || 'No se pudo procesar el pago.'}`;
+                 } finally {
+                     submitPaymentBtn.disabled = false;
+                     submitPaymentBtn.textContent = 'Pagar Ahora';
+                 }
+            });
+
+
+             // --- Inicialización Cliente ---
+             document.getElementById('current-year-client-billing').textContent = new Date().getFullYear();
+              if (CURRENT_USER_IDENTIFIER) {
+                 welcomeMessageSpanClient.textContent = `Bienvenido, ${CURRENT_USER_IDENTIFIER}!`;
+                 welcomeMessageSpanClient.classList.remove('hidden');
+             }
+             loadClientInvoices(); // Carga inicial
+
+        });
+    </script>
+
+</body>
+</html>

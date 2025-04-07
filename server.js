@@ -13,7 +13,8 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(express.json());
 const bcrypt = require('bcrypt');
-
+// --- Pool de Conexiones ---
+let pool;
 
 // Middleware (aplicar en este orden)
 app.use(cors({
@@ -993,7 +994,317 @@ app.post('/api/feedback', async (req, res) => {
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
+// ---------- INICIO SECCIÓN BILLING API (server.js) ----------
 
+// --- Rutas de Catálogo de Servicios ---
+app.get('/api/services', async (req, res) => {
+  // #swagger.tags = ['Services']
+  // #swagger.summary = 'Obtener lista de servicios del catálogo'
+  if (!pool) { return res.status(500).json({ message: "Error interno: Conexión no lista." }); }
+  try {
+      const request = pool.request();
+      // Asegúrate que los nombres de columna coincidan con tu tabla Services
+      const result = await request.query("SELECT ServiceID, Name, Description, DefaultPrice FROM Services ORDER BY Name");
+      res.json(result.recordset);
+  } catch (error) {
+      console.error("Error en GET /api/services:", error.message);
+      res.status(500).json({ message: "Error interno al obtener servicios." });
+  }
+});
+
+// --- Rutas de Usuarios (Necesaria para Dropdown Clientes) ---
+app.get('/api/users', async (req, res) => {
+   // #swagger.tags = ['Users']
+   // #swagger.summary = '(Dependencia Billing) Obtener lista de usuarios (clientes) con opción de búsqueda'
+  if (!pool) { return res.status(500).json({ message: "Error interno: Conexión no lista." }); }
+  const { search } = req.query;
+  try {
+      let query = `SELECT ID, FullName, Email, PhoneNumber FROM Users WHERE 1=1 `; // Excluye Password
+      const request = pool.request();
+      if (search) { query += " AND (FullName LIKE @Search OR Email LIKE @Search)"; request.input('Search', sql.NVarChar, `%${search}%`); }
+      query += " ORDER BY FullName;";
+      const result = await request.query(query);
+      res.json(result.recordset);
+  } catch (error) {
+      console.error("Error en GET /api/users:", error.message);
+      res.status(500).json({ message: "Error al buscar usuarios." });
+  }
+});
+
+// --- Rutas de Citas (Necesaria para Dropdown Citas Asociadas) ---
+app.get('/api/appointments', async (req, res) => {
+  // #swagger.tags = ['Appointments']
+  // #swagger.summary = '(Dependencia Billing) Obtener citas, opcionalmente filtradas por usuario y estado'
+  if (!pool) { return res.status(500).json({ message: "Error DB" }); }
+  const { status, userId } = req.query;
+
+  try {
+      let query = `
+          SELECT
+              A.AppointmentID, A.UserID, A.AppointmentDateTime, A.VehicleDescription,
+              A.ServiceType, A.Status, A.Notes, A.CreatedAt, A.UpdatedAt,
+              U.FullName AS ClientFullName,
+              SF.FeedbackID, SF.Rating AS FeedbackRating, SF.Comments AS FeedbackComments, SF.SubmittedAt AS FeedbackSubmittedAt
+          FROM Appointments A
+          LEFT JOIN Users U ON A.UserID = U.ID
+          LEFT JOIN ServiceFeedback SF ON A.AppointmentID = SF.AppointmentID
+          WHERE 1=1
+      `;
+      const request = pool.request();
+      const conditions = [];
+
+      if (status) { conditions.push("A.Status = @Status"); request.input('Status', sql.NVarChar, status); }
+      // IMPORTANTE: Este filtro userId ahora sí funciona con el código frontend más reciente
+      if (userId && !isNaN(parseInt(userId))) { conditions.push("A.UserID = @UserID"); request.input('UserID', sql.Int, parseInt(userId)); }
+
+      if (conditions.length > 0) { query += " AND " + conditions.join(" AND "); }
+      query += " ORDER BY A.AppointmentDateTime DESC;";
+
+      const result = await request.query(query);
+      const appointments = result.recordset.map(app => ({
+          AppointmentID: app.AppointmentID, UserID: app.UserID, AppointmentDateTime: app.AppointmentDateTime,
+          VehicleDescription: app.VehicleDescription, ServiceType: app.ServiceType, Status: app.Status,
+          Notes: app.Notes, CreatedAt: app.CreatedAt, UpdatedAt: app.UpdatedAt,
+          User: { FullName: app.ClientFullName },
+          // Mapeo completo de Feedback
+          Feedback: app.FeedbackID ? {
+              FeedbackID: app.FeedbackID,
+              Rating: app.FeedbackRating,
+              Comments: app.FeedbackComments,
+              SubmittedAt: app.FeedbackSubmittedAt
+           } : null
+      }));
+      res.json(appointments);
+  } catch (error) {
+      console.error("Error en GET /api/appointments:", error.message);
+      res.status(500).json({ message: "Error interno al obtener citas." });
+  }
+});
+
+
+// --- Rutas de Facturación (Invoices & Billing) ---
+
+// GET /api/billing/summary - Obtener resumen para tarjetas admin
+app.get('/api/billing/summary', async (req, res) => {
+  // #swagger.tags = ['Billing']
+  // #swagger.summary = 'Obtener resumen de facturación para dashboard admin'
+  if (!pool) { return res.status(500).json({ message: "Error DB" }); }
+  try {
+      const statusQuery = `SELECT Status, COUNT(*) AS Count, SUM(CASE WHEN Status = 'paid' THEN TotalAmount ELSE 0 END) AS AmountSum FROM Invoices GROUP BY Status;`;
+      // Asume que existe DueDate para calcular vencidas correctamente
+      const overdueQuery = `SELECT COUNT(*) AS OverdueCount FROM Invoices WHERE Status = 'pending' AND DueDate IS NOT NULL AND DueDate < GETDATE();`;
+      const requestStatus = pool.request(); const requestOverdue = pool.request();
+      const [statusResult, overdueResult] = await Promise.all([ requestStatus.query(statusQuery), requestOverdue.query(overdueQuery) ]);
+
+      const summary = { total: 0, pending: 0, overdue: 0, paid: 0, cancelled: 0, revenue: 0.00 };
+      statusResult.recordset.forEach(row => {
+          summary.total += row.Count; const statusKey = row.Status?.toLowerCase();
+          if (statusKey && summary.hasOwnProperty(statusKey)) summary[statusKey] = row.Count;
+          if (statusKey === 'paid') summary.revenue = parseFloat(row.AmountSum || 0);
+      });
+      summary.overdue = overdueResult.recordset[0]?.OverdueCount || 0; // Usa el conteo real
+      res.json(summary);
+  } catch (error) {
+      console.error("Error en GET /api/billing/summary:", error.message);
+      res.status(500).json({ message: "Error interno al obtener resumen de facturación." });
+  }
+});
+
+// GET /api/invoices - Obtener lista de facturas (con filtros)
+app.get('/api/invoices', async (req, res) => {
+ // #swagger.tags = ['Invoices']
+ // ... (swagger params igual que antes) ...
+ if (!pool) { return res.status(500).json({ message: "Error DB" }); }
+ const { search, status, startDate, endDate, userId } = req.query;
+ try {
+    let query = `
+        SELECT
+            I.InvoiceID, I.UserID, I.InvoiceDate, I.DueDate, I.TotalAmount, I.Status,
+            U.FullName AS ClientFullName
+        FROM Invoices I
+        LEFT JOIN Users U ON I.UserID = U.ID
+        WHERE 1=1
+    `;
+    const request = pool.request(); const conditions = [];
+    if (status) { conditions.push("I.Status = @Status"); request.input('Status', sql.NVarChar, status); }
+    if (search) {
+        conditions.push(`(CAST(I.InvoiceID AS NVARCHAR(20)) = @SearchExact OR U.FullName LIKE @SearchPattern OR U.Email LIKE @SearchPattern)`);
+        let searchExact = search.toUpperCase().startsWith('#INV-') ? search.substring(5) : search; if (!/^\d+$/.test(searchExact)) searchExact = '-1';
+        request.input('SearchExact', sql.NVarChar, searchExact); request.input('SearchPattern', sql.NVarChar, `%${search}%`);
+    }
+    if (startDate) { conditions.push("I.InvoiceDate >= @StartDate"); request.input('StartDate', sql.Date, startDate); }
+    if (endDate) { conditions.push("I.InvoiceDate <= @EndDate"); request.input('EndDate', sql.Date, endDate); }
+    if (userId && !isNaN(parseInt(userId))) { conditions.push("I.UserID = @UserID"); request.input('UserID', sql.Int, parseInt(userId)); }
+    if (conditions.length > 0) { query += " AND " + conditions.join(" AND "); }
+    query += " ORDER BY I.InvoiceDate DESC;";
+    const result = await request.query(query);
+    const invoices = result.recordset.map(inv => ({ ...inv, User: { FullName: inv.ClientFullName || null } }));
+    res.json(invoices);
+ } catch (error) {
+    console.error("Error en GET /api/invoices:", error.message);
+    res.status(500).json({ message: "Error interno al obtener facturas." });
+ }
+});
+
+// POST /api/invoices - Crear nueva factura (CON CÁLCULO CORREGIDO)
+app.post('/api/invoices', async (req, res) => {
+  // #swagger.tags = ['Invoices']
+  // ... (swagger params igual que antes) ...
+  if (!pool) { return res.status(500).json({ message: "Error DB" }); }
+  const { userId, appointmentId, discount, taxRate, status, items } = req.body;
+
+  // Validación más robusta
+  const errors = [];
+  if (!userId || isNaN(parseInt(userId))) errors.push("UserID inválido o faltante.");
+  if (!status || !['pending', 'paid'].includes(status.toLowerCase())) errors.push("Estado inválido (debe ser 'pending' o 'paid').");
+  if (!items || !Array.isArray(items) || items.length === 0) errors.push("Se requiere al menos un item.");
+  else {
+      items.forEach((item, index) => {
+          if (!item.description?.trim()) errors.push(`Item ${index + 1}: Descripción requerida.`);
+          const quantity = parseInt(item.quantity || '1');
+          const unitPrice = parseFloat(item.unitPrice || '0');
+          if (isNaN(quantity) || quantity <= 0) errors.push(`Item ${index + 1} (${item.description || ''}): Cantidad inválida.`);
+          if (isNaN(unitPrice) || unitPrice < 0) errors.push(`Item ${index + 1} (${item.description || ''}): Precio Unitario inválido.`);
+      });
+  }
+  if (errors.length > 0) { return res.status(400).json({ message: "Errores de validación.", errors }); }
+
+  let transaction;
+  try {
+      transaction = pool.transaction(); await transaction.begin();
+      console.log("--- Iniciando Transacción Creación Factura ---");
+
+      // 1. **** CORRECCIÓN: Calcular Totales CORRECTAMENTE ****
+      let subtotal = 0;
+      console.log("--- Calculando Subtotal de Items ---");
+      items.forEach((item, index) => {
+          const quantity = parseInt(item.quantity || '1');
+          const unitPrice = parseFloat(item.unitPrice || '0');
+          // Asegurarse de que sean números válidos antes de sumar
+          if (!isNaN(quantity) && !isNaN(unitPrice)) {
+               console.log(`  Item ${index + 1}: Qty=${quantity}, Price=${unitPrice}, LineTotal=${quantity * unitPrice}`);
+               subtotal += quantity * unitPrice;
+          } else {
+              // Esto ya no debería pasar por la validación inicial, pero es una salvaguarda
+               console.warn(`Item ${index + 1} con valores inválidos, omitido del subtotal.`);
+          }
+      });
+
+      let discountAmount = 0;
+      const discountValue = discount || '0';
+      if (typeof discountValue === 'string' && discountValue.endsWith('%')) {
+          const percent = parseFloat(discountValue.replace('%', '')) || 0;
+          discountAmount = subtotal * (percent / 100);
+      } else {
+          discountAmount = parseFloat(discountValue) || 0;
+      }
+      // Validar que el descuento no sea negativo
+      discountAmount = Math.max(0, discountAmount);
+
+      const subtotalAfterDiscount = Math.max(0, subtotal - discountAmount); // Evitar negativo
+      const taxRatePercent = parseFloat(taxRate || '0');
+      const taxAmount = subtotalAfterDiscount * (taxRatePercent / 100);
+      const totalAmount = subtotalAfterDiscount + taxAmount;
+
+      console.log(`--- Totales Calculados ---`);
+      console.log(`Subtotal Bruto: ${subtotal.toFixed(2)}`);
+      console.log(`Descuento Aplicado: ${discountAmount.toFixed(2)} (Input: ${discountValue})`);
+      console.log(`Subtotal c/Desc: ${subtotalAfterDiscount.toFixed(2)}`);
+      console.log(`Tasa Impuesto: ${taxRatePercent}%`);
+      console.log(`Monto Impuesto: ${taxAmount.toFixed(2)}`);
+      console.log(`>>> Monto Total Final: ${totalAmount.toFixed(2)}`); // <<< Verificar este valor
+
+      // Validar que el total final sea un número válido y no negativo
+      if (isNaN(totalAmount) || totalAmount < 0) {
+           throw new Error("Error en el cálculo del monto total final. Verifique precios, cantidades, descuento e impuesto.");
+      }
+
+      const invoiceDate = new Date(); const dueDate = new Date(invoiceDate); dueDate.setDate(dueDate.getDate() + 30); // DueDate a 30 días
+
+      // 2. Insertar en Invoices (con corchetes y valor TOTAL correcto)
+      const invoiceRequest = transaction.request();
+      invoiceRequest.input('UserID', sql.Int, userId);
+      invoiceRequest.input('AppointmentID', sql.Int, appointmentId || null);
+      invoiceRequest.input('InvoiceDate', sql.DateTime2, invoiceDate);
+      invoiceRequest.input('DueDate', sql.DateTime2, dueDate);
+      invoiceRequest.input('Subtotal', sql.Decimal(10, 2), subtotal);
+      invoiceRequest.input('Discount', sql.Decimal(10, 2), discountAmount);
+      invoiceRequest.input('TaxAmount', sql.Decimal(10, 2), taxAmount);
+      invoiceRequest.input('TotalAmount', sql.Decimal(10, 2), totalAmount); // <<< Usar totalAmount calculado
+      invoiceRequest.input('Status', sql.NVarChar, status);
+      const invoiceQuery = `
+          INSERT INTO Invoices ([UserID], [AppointmentID], [InvoiceDate], [DueDate], [Subtotal], [Discount], [TaxAmount], [TotalAmount], [Status])
+          OUTPUT INSERTED.InvoiceID, INSERTED.TotalAmount, INSERTED.Status, INSERTED.InvoiceDate, INSERTED.UserID, INSERTED.DueDate
+          VALUES (@UserID, @AppointmentID, @InvoiceDate, @DueDate, @Subtotal, @Discount, @TaxAmount, @TotalAmount, @Status);`;
+      console.log("--- Ejecutando Query Invoices ---");
+      const invoiceResult = await invoiceRequest.query(invoiceQuery);
+      const newInvoiceId = invoiceResult.recordset[0].InvoiceID;
+      const createdInvoiceHeader = invoiceResult.recordset[0];
+      console.log(`--- Inserción Invoices OK (ID: ${newInvoiceId}, Total Insertado: ${createdInvoiceHeader.TotalAmount}) ---`); // Log del total insertado
+
+      // 3. Insertar en InvoiceItems (secuencialmente)
+      console.log(`--- Iniciando inserción de ${items.length} items para InvoiceID: ${newInvoiceId} ---`);
+      const itemRequest = transaction.request();
+      for (const item of items) {
+          const currentQuantity = parseInt(item.quantity || '1');
+          const currentPrice = parseFloat(item.unitPrice || '0');
+          const currentServiceId = item.serviceId || null;
+          const currentDescription = item.description?.trim() || 'N/A';
+          itemRequest.input('InvoiceID_Item', sql.Int, newInvoiceId);
+          itemRequest.input('ServiceID_Item', sql.Int, currentServiceId);
+          itemRequest.input('Description_Item', sql.NVarChar, currentDescription);
+          itemRequest.input('Quantity_Item', sql.Int, currentQuantity);
+          itemRequest.input('UnitPrice_Item', sql.Decimal(10, 2), currentPrice);
+          const itemQuery = `INSERT INTO InvoiceItems ([InvoiceID], [ServiceID], [Description], [Quantity], [UnitPrice]) VALUES (@InvoiceID_Item, @ServiceID_Item, @Description_Item, @Quantity_Item, @UnitPrice_Item);`;
+          await itemRequest.query(itemQuery);
+          console.log(`    Item '${item.description}' insertado.`);
+      }
+      console.log(`--- Fin inserción de items ---`);
+
+      // 4. Commit
+      await transaction.commit();
+      console.log(`--- Transacción completada para InvoiceID: ${newInvoiceId} ---`);
+
+      // 5. Devolver respuesta
+      res.status(201).json({ message: `Factura #${newInvoiceId} creada.`, invoice: createdInvoiceHeader });
+
+  } catch (error) {
+      console.error("Error en POST /api/invoices:", error);
+      if (transaction && transaction.active) { try { await transaction.rollback(); console.log("Rollback exitoso por error."); } catch (rbErr) { console.error("Error en Rollback:", rbErr); } }
+      res.status(500).json({ message: `Error al crear factura: ${error.originalError?.message || error.message || 'Error desconocido.'}` });
+  }
+});
+
+// PATCH /api/invoices/:id/status - Actualizar estado (ej: 'paid', 'cancelled')
+app.patch('/api/invoices/:id/status', async (req, res) => {
+ // #swagger.tags = ['Invoices']
+ // ... (swagger params) ...
+ if (!pool) { return res.status(500).json({ message: "Error DB" }); }
+ const invoiceId = parseInt(req.params.id); const { status } = req.body;
+ const validStatuses = ['pending', 'paid', 'cancelled', 'overdue'];
+ if (isNaN(invoiceId)) return res.status(400).json({ message: "ID inválido." });
+ if (!status || !validStatuses.includes(status.toLowerCase())) return res.status(400).json({ message: `Estado inválido.` });
+
+ try {
+     const request = pool.request();
+     request.input('InvoiceID', sql.Int, invoiceId);
+     request.input('Status', sql.NVarChar, status.toLowerCase());
+     // Considera añadir una columna UpdatedAt a Invoices y actualizarla aquí
+     // request.input('UpdatedAt', sql.DateTime2, new Date());
+     // const query = `UPDATE Invoices SET Status = @Status, UpdatedAt = @UpdatedAt WHERE InvoiceID = @InvoiceID; SELECT @@ROWCOUNT AS RowsAffected;`;
+     const query = `UPDATE Invoices SET Status = @Status WHERE InvoiceID = @InvoiceID; SELECT @@ROWCOUNT AS RowsAffected;`;
+
+     const result = await request.query(query);
+     if (result.recordset[0]?.RowsAffected === 0) return res.status(404).json({ message: "Factura no encontrada." });
+     res.json({ InvoiceID: invoiceId, Status: status.toLowerCase() });
+ } catch (error) {
+     console.error(`Error en PATCH /api/invoices/${invoiceId}/status:`, error.message);
+     res.status(500).json({ message: "Error interno al actualizar estado." });
+ }
+});
+////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////
 
 
 

@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facturación (Admin) - AutoCare Rodriguez</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style> /* Estilos personalizados si los necesitas */ </style>
+</head>
+<body class="bg-gray-50">
+    <nav class="bg-gray-800 text-white px-6 py-4">
+        <div class="flex items-center justify-between">
+            <h1 class="text-2xl font-bold">AutoCare Rodriguez</h1>
+            <div class="flex space-x-4">
+                <a href="index.html"> <button class="px-4 py-2 rounded hover:bg-gray-700">Clientes</button> </a>
+                <a href="/html/2Dates.html"><button class="px-4 py-2 rounded hover:bg-gray-700">Citas</button></a>
+                <a href="/html/3.1SegService.html"><button class="px-4 py-2 rounded hover:bg-gray-700">SegService</button></a>
+                <a href="/html/4Inventory.html"><button class="px-4 py-2 rounded hover:bg-gray-700">Inventario</button></a>
+                <a href="/html/5Billing.html"><button class="px-4 py-2 rounded bg-gray-700">Facturación</button></a> <a href="/html/7Users.html"> <button class="px-4 py-2 rounded hover:bg-gray-700">Usuarios</button> </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto px-4 py-6"> <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white rounded-lg shadow p-6">
+                <h3 class="text-lg font-semibold mb-2">Total Facturas</h3>
+                <p id="total-invoices-count" class="text-3xl font-bold text-blue-600">--</p> </div>
+            <div class="bg-white rounded-lg shadow p-6">
+                <h3 class="text-lg font-semibold mb-2">Pago Pendiente</h3>
+                <p id="pending-invoices-count" class="text-3xl font-bold text-yellow-600">--</p> </div>
+            <div class="bg-white rounded-lg shadow p-6">
+                <h3 class="text-lg font-semibold mb-2">Vencidas</h3>
+                <p id="overdue-invoices-count" class="text-3xl font-bold text-red-600">--</p> </div>
+            <div class="bg-white rounded-lg shadow p-6">
+                <h3 class="text-lg font-semibold mb-2">Ingresos (Pagado)</h3>
+                <p id="revenue-total" class="text-3xl font-bold text-green-600">$ --</p> </div>
+        </div>
+
+        <div class="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4 mb-6">
+            <input type="text" id="invoice-search" placeholder="Buscar #Factura o Cliente..." class="flex-1 px-4 py-2 border rounded-lg">
+            <select id="invoice-status-filter" class="px-4 py-2 border rounded-lg">
+                <option value="">Todos los Estados</option>
+                <option value="paid">Pagada</option>
+                <option value="pending">Pendiente</option>
+                <option value="overdue">Vencida</option>
+                <option value="cancelled">Cancelada</option>
+            </select>
+            <button id="filter-invoices-btn" class="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700">Filtrar</button>
+            <button id="open-new-invoice-modal-btn" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">Nueva Factura</button>
+        </div>
+
+         <div id="api-error-message" class="mb-4 p-3 text-red-700 bg-red-100 border border-red-400 rounded hidden"></div>
+
+
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <table class="w-full">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Factura #</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha Factura</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Monto Total</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="admin-invoices-table-body" class="divide-y divide-gray-200">
+                    <tr id="loading-invoices-row">
+                        <td colspan="6" class="text-center py-4 text-gray-500">Cargando facturas...</td>
+                    </tr>
+                    </tbody>
+            </table>
+             <div id="no-admin-invoices" class="text-center py-4 text-gray-500 hidden">No se encontraron facturas.</div>
+        </div>
+    </div>
+
+    <div id="newInvoiceModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto p-4">
+        <div class="bg-white rounded-lg p-8 max-w-3xl w-full m-auto"> <div class="flex justify-between items-center mb-6">
+                 <h3 class="text-xl font-semibold">Generar Nueva Factura</h3>
+                  <button id="close-new-invoice-modal-btn" type="button" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                 </button>
+            </div>
+
+            <form id="new-invoice-form" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="invoice-customer" class="block text-sm font-medium mb-1">Cliente</label>
+                        <select id="invoice-customer" name="userId" required class="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                            <option value="">Seleccione Cliente...</option>
+                            </select>
+                    </div>
+                    <div>
+                         <label for="invoice-appointment" class="block text-sm font-medium mb-1">Cita Asociada (Opcional)</label>
+                         <select id="invoice-appointment" name="appointmentId" class="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                            <option value="">Ninguna / Manual</option>
+                             </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-1">Items / Servicios</label>
+                    <div id="invoice-items-container" class="space-y-2 border p-3 rounded-md max-h-60 overflow-y-auto">
+                        <div class="invoice-item flex items-center gap-2">
+                             <input type="text" name="itemDescription[]" placeholder="Descripción del item/servicio" class="flex-grow px-3 py-1 border rounded text-sm" required>
+                             <input type="number" name="itemQuantity[]" value="1" min="1" placeholder="Cant." class="w-16 px-2 py-1 border rounded text-sm" required>
+                             <input type="number" name="itemPrice[]" step="0.01" min="0" placeholder="Precio U." class="w-24 px-2 py-1 border rounded text-sm" required>
+                             <button type="button" class="remove-item-btn text-red-500 hover:text-red-700 text-xs">Eliminar</button>
+                        </div>
+                    </div>
+                     <button type="button" id="add-invoice-item-btn" class="mt-2 text-sm text-blue-600 hover:text-blue-800">+ Añadir Item</button>
+                     <button type="button" id="add-service-from-catalog-btn" class="mt-2 ml-4 text-sm text-green-600 hover:text-green-800">+ Añadir Servicio Catálogo</button>
+                 </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t">
+                    <div>
+                        <label for="invoice-discount" class="block text-sm font-medium mb-1">Descuento ($ o %)</label>
+                        <input type="text" id="invoice-discount" name="discount" placeholder="Ej: 10 o 5%" class="w-full px-4 py-2 border rounded-lg">
+                    </div>
+                    <div>
+                         <label for="invoice-tax" class="block text-sm font-medium mb-1">Impuesto (%)</label>
+                        <input type="number" id="invoice-tax" name="taxRate" value="0" step="0.01" min="0" class="w-full px-4 py-2 border rounded-lg">
+                    </div>
+                    <div>
+                        <label for="invoice-status" class="block text-sm font-medium mb-1">Estado Inicial</label>
+                         <select id="invoice-status" name="status" required class="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                             <option value="pending" selected>Pendiente</option>
+                             <option value="paid">Pagada</option>
+                         </select>
+                    </div>
+                 </div>
+
+                 <div class="border-t pt-4 mt-4">
+                     <div class="flex justify-end text-right">
+                         <div>
+                             <p class="text-sm text-gray-500">Subtotal:</p>
+                             <p class="text-sm text-gray-500">Descuento:</p>
+                             <p class="text-sm text-gray-500">Impuestos:</p>
+                             <p class="text-lg font-semibold mt-1">Total a Pagar:</p>
+                         </div>
+                         <div class="ml-4 font-medium">
+                            <p id="invoice-subtotal" class="text-sm text-gray-500">$0.00</p>
+                            <p id="invoice-discount-amount" class="text-sm text-gray-500">-$0.00</p>
+                            <p id="invoice-tax-amount" class="text-sm text-gray-500">+$0.00</p>
+                            <p id="invoice-total-amount" class="text-lg font-semibold mt-1">$0.00</p>
+                         </div>
+                     </div>
+                 </div>
+                 <div id="new-invoice-feedback" class="text-red-600 text-sm mt-2"></div>
+
+                <div class="flex justify-end space-x-4 pt-4 border-t">
+                    <button type="button" id="cancel-new-invoice-btn" class="px-6 py-2 border rounded-lg hover:bg-gray-100">Cancelar</button>
+                    <button type="submit" id="submit-new-invoice-btn" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                        Generar Factura
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div id="serviceCatalogModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+         <div class="bg-white rounded-lg p-6 max-w-xl w-full m-auto">
+             <div class="flex justify-between items-center mb-4">
+                 <h3 class="text-lg font-semibold">Seleccionar Servicio del Catálogo</h3>
+                 <button id="close-service-catalog-modal-btn" type="button" class="text-gray-400 hover:text-gray-600">X</button>
+             </div>
+             <input type="text" id="service-catalog-search" placeholder="Buscar servicio..." class="w-full px-3 py-2 border rounded mb-3">
+             <div id="service-catalog-list" class="max-h-60 overflow-y-auto border rounded p-2 space-y-1">
+                 <p class="text-center text-gray-500">Cargando servicios...</p>
+             </div>
+             <div class="mt-4 text-right">
+                 <button type="button" id="add-selected-services-btn" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Añadir Seleccionados</button>
+             </div>
+         </div>
+     </div>
+
+
+    <footer class="bg-gray-800 text-white py-6 px-6 mt-8">
+        <div class="container mx-auto text-center">
+            <p>&copy; <span id="current-year-admin-billing"></span> AutoCare Rodriguez. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+        // --- Funciones básicas para Modales ---
+        function showModal(modalId) { document.getElementById(modalId)?.classList.remove('hidden'); }
+        function hideModal(modalId) { document.getElementById(modalId)?.classList.add('hidden'); }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- Configuración y Elementos ---
+            const API_BASE_URL = 'http://localhost:3000';
+            const adminInvoicesTableBody = document.getElementById('admin-invoices-table-body');
+            const loadingInvoicesRow = document.getElementById('loading-invoices-row');
+            const noAdminInvoicesDiv = document.getElementById('no-admin-invoices');
+            const apiErrorMessageDiv = document.getElementById('api-error-message');
+            // Modal Nueva Factura Elements
+            const newInvoiceModal = document.getElementById('newInvoiceModal');
+            const openNewInvoiceBtn = document.getElementById('open-new-invoice-modal-btn');
+            const closeNewInvoiceBtn = document.getElementById('close-new-invoice-modal-btn');
+            const cancelNewInvoiceBtn = document.getElementById('cancel-new-invoice-btn');
+            const newInvoiceForm = document.getElementById('new-invoice-form');
+            const customerSelect = document.getElementById('invoice-customer');
+            const appointmentSelect = document.getElementById('invoice-appointment');
+            const itemsContainer = document.getElementById('invoice-items-container');
+            const addItemBtn = document.getElementById('add-invoice-item-btn');
+            const addServiceCatalogBtn = document.getElementById('add-service-from-catalog-btn');
+            const discountInput = document.getElementById('invoice-discount');
+            const taxInput = document.getElementById('invoice-tax');
+            const subtotalSpan = document.getElementById('invoice-subtotal');
+            const discountAmountSpan = document.getElementById('invoice-discount-amount');
+            const taxAmountSpan = document.getElementById('invoice-tax-amount');
+            const totalAmountSpan = document.getElementById('invoice-total-amount');
+            const newInvoiceFeedbackDiv = document.getElementById('new-invoice-feedback');
+            const submitNewInvoiceBtn = document.getElementById('submit-new-invoice-btn');
+            // Modal Catálogo Servicios Elements
+            const serviceCatalogModal = document.getElementById('serviceCatalogModal');
+            const closeServiceCatalogBtn = document.getElementById('close-service-catalog-modal-btn');
+            const serviceCatalogListDiv = document.getElementById('service-catalog-list');
+            const addSelectedServicesBtn = document.getElementById('add-selected-services-btn');
+            const serviceCatalogSearchInput = document.getElementById('service-catalog-search');
+            // Filtros tabla admin Elements
+            const filterInvoicesBtn = document.getElementById('filter-invoices-btn');
+            const invoiceSearchInput = document.getElementById('invoice-search');
+            const invoiceStatusFilter = document.getElementById('invoice-status-filter');
+            // Tarjetas Resumen Elements
+            const totalInvoicesSpan = document.getElementById('total-invoices-count');
+            const pendingInvoicesSpan = document.getElementById('pending-invoices-count');
+            const overdueInvoicesSpan = document.getElementById('overdue-invoices-count');
+            const revenueSpan = document.getElementById('revenue-total');
+
+            let serviceCatalogData = []; // Caché para catálogo de servicios
+
+            // --- Funciones Auxiliares ---
+            function showApiError(message) {
+                apiErrorMessageDiv.textContent = `Error API: ${message}`;
+                apiErrorMessageDiv.classList.remove('hidden');
+                 setTimeout(hideApiError, 5000); // Ocultar después de 5s
+            }
+            function hideApiError() {
+                apiErrorMessageDiv.classList.add('hidden');
+                apiErrorMessageDiv.textContent = '';
+            }
+             // Función genérica para fetch (sin autenticación)
+            async function apiFetch(endpoint, options = {}) {
+                options.headers = { 'Content-Type': 'application/json', ...options.headers };
+                try {
+                    const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
+                    if (!response.ok) {
+                        let errorData = { message: `Error HTTP ${response.status}: ${response.statusText}` };
+                        try { errorData.message = (await response.json()).message || errorData.message; } catch (e) {}
+                        throw new Error(errorData.message);
+                    }
+                    return response.status === 204 ? null : await response.json();
+                } catch (error) {
+                    console.error('API Fetch Error:', error);
+                    showApiError(error.message || 'Error de conexión.');
+                    throw error; // Propagar para manejo específico si es necesario
+                }
+            }
+
+            // --- Lógica de la Página ---
+
+            // Mostrar/Ocultar Modales
+            openNewInvoiceBtn?.addEventListener('click', () => {
+                resetNewInvoiceForm();
+                loadCustomersForInvoice();
+                showModal('newInvoiceModal');
+            });
+            closeNewInvoiceBtn?.addEventListener('click', () => hideModal('newInvoiceModal'));
+            cancelNewInvoiceBtn?.addEventListener('click', () => hideModal('newInvoiceModal'));
+            addServiceCatalogBtn?.addEventListener('click', () => {
+                loadServiceCatalog(); // Cargar/recargar catálogo al abrir
+                showModal('serviceCatalogModal');
+            });
+            closeServiceCatalogBtn?.addEventListener('click', () => hideModal('serviceCatalogModal'));
+
+            // --- Lógica Modal Nueva Factura ---
+             function resetNewInvoiceForm() {
+                 newInvoiceForm.reset(); itemsContainer.innerHTML = '';
+                 addInvoiceItemRow(); calculateInvoiceTotals();
+                 newInvoiceFeedbackDiv.textContent = '';
+                 appointmentSelect.innerHTML = '<option value="">Ninguna / Manual</option>';
+                 appointmentSelect.disabled = true;
+                 customerSelect.innerHTML = '<option value="">Cargando...</option>';
+                 hideApiError(); // Limpiar errores globales al resetear
+             }
+
+             addItemBtn?.addEventListener('click', () => addInvoiceItemRow());
+
+             function addInvoiceItemRow(description = '', quantity = 1, price = 0) {
+                 const newItemRow = document.createElement('div');
+                 newItemRow.classList.add('invoice-item', 'flex', 'items-center', 'gap-2', 'mb-2'); // Añadido mb-2
+                 newItemRow.innerHTML = `
+                     <input type="text" name="itemDescription[]" placeholder="Descripción" class="flex-grow px-3 py-1 border rounded text-sm" required value="${description.replace(/"/g, '&quot;')}">
+                     <input type="number" name="itemQuantity[]" value="${quantity}" min="1" placeholder="Cant." class="w-16 px-2 py-1 border rounded text-sm text-right" required>
+                     <input type="number" name="itemPrice[]" value="${price.toFixed(2)}" step="0.01" min="0" placeholder="Precio U." class="w-24 px-2 py-1 border rounded text-sm text-right" required>
+                     <button type="button" class="remove-item-btn text-red-500 hover:text-red-700 text-sm p-1" title="Eliminar Item">✕</button>
+                 `;
+                 itemsContainer.appendChild(newItemRow);
+                 newItemRow.querySelector('.remove-item-btn').addEventListener('click', (e) => {
+                     e.target.closest('.invoice-item').remove();
+                     calculateInvoiceTotals();
+                 });
+                 newItemRow.querySelectorAll('input[type="number"]').forEach(input => {
+                     input.addEventListener('input', calculateInvoiceTotals);
+                 });
+                 newItemRow.querySelector('input[type="text"]').addEventListener('input', calculateInvoiceTotals); // Recalcular si cambia descripción? Opcional.
+             }
+
+             itemsContainer.addEventListener('input', (e) => {
+                  if(e.target.matches('input[name^="item"]')) { calculateInvoiceTotals(); }
+             });
+
+              function calculateInvoiceTotals() {
+                 let subtotal = 0;
+                 itemsContainer.querySelectorAll('.invoice-item').forEach(row => {
+                     const quantity = parseFloat(row.querySelector('input[name="itemQuantity[]"]').value) || 0;
+                     const price = parseFloat(row.querySelector('input[name="itemPrice[]"]').value) || 0;
+                     subtotal += quantity * price;
+                 });
+                 const discountStr = discountInput.value.trim(); let discountAmount = 0;
+                 if (discountStr.endsWith('%')) { discountAmount = subtotal * (parseFloat(discountStr.replace('%',''))||0)/100; }
+                 else { discountAmount = parseFloat(discountStr)||0; }
+                 const subtotalAfterDiscount = Math.max(0, subtotal - discountAmount); // Evitar subtotal negativo
+                 const taxRate = parseFloat(taxInput.value) || 0;
+                 const taxAmount = subtotalAfterDiscount * (taxRate / 100);
+                 const total = subtotalAfterDiscount + taxAmount;
+                 subtotalSpan.textContent = `$${subtotal.toFixed(2)}`;
+                 discountAmountSpan.textContent = `-$${discountAmount.toFixed(2)}`;
+                 taxAmountSpan.textContent = `+$${taxAmount.toFixed(2)}`;
+                 totalAmountSpan.textContent = `$${total.toFixed(2)}`;
+             }
+             discountInput?.addEventListener('input', calculateInvoiceTotals);
+             taxInput?.addEventListener('input', calculateInvoiceTotals);
+
+             async function loadCustomersForInvoice() {
+                 customerSelect.disabled = true;
+                 customerSelect.innerHTML = '<option value="">Cargando clientes...</option>';
+                 try {
+                     const users = await apiFetch('/api/users'); // Llama a la API
+                     customerSelect.innerHTML = '<option value="">Seleccione Cliente...</option>';
+                     users.forEach(user => {
+                         const option = document.createElement('option');
+                         option.value = user.ID;
+                         option.textContent = `${user.FullName} (${user.Email || 'Sin Email'})`;
+                         customerSelect.appendChild(option);
+                     });
+                 } catch (error) { customerSelect.innerHTML = '<option value="">Error al cargar</option>'; }
+                 finally { customerSelect.disabled = false; }
+             }
+
+             customerSelect?.addEventListener('change', async (e) => {
+                 const selectedUserId = e.target.value;
+                 appointmentSelect.innerHTML = '<option value="">Cargando citas...</option>';
+                 appointmentSelect.disabled = true;
+                 if (!selectedUserId) {
+                    appointmentSelect.innerHTML = '<option value="">Ninguna / Manual</option>';
+                    return;
+                 }
+                 try {
+                     // **LLAMA AL ENDPOINT MODIFICADO O NUEVO**
+                     // Asume que GET /api/appointments ahora acepta userId y status
+                     const appointments = await apiFetch(`/api/appointments?userId=${selectedUserId}&status=completed`);
+                     appointmentSelect.innerHTML = '<option value="">Ninguna / Manual</option>';
+                     if (appointments.length > 0) {
+                          appointments.forEach(app => {
+                              const option = document.createElement('option');
+                              option.value = app.AppointmentID;
+                              const appDate = new Date(app.AppointmentDateTime).toLocaleDateString('es-MX',{dateStyle: 'short'});
+                              option.textContent = `${appDate} - ${app.ServiceType} (${app.VehicleDescription})`;
+                              // Guardar datos para posible auto-llenado (opcional)
+                              option.dataset.appointmentData = JSON.stringify(app); // Guardar todo el objeto
+                              appointmentSelect.appendChild(option);
+                          });
+                     } else {
+                        appointmentSelect.innerHTML = '<option value="">Cliente sin citas completadas</option>';
+                     }
+                 } catch (error) { appointmentSelect.innerHTML = '<option value="">Error al cargar citas</option>'; }
+                 finally { appointmentSelect.disabled = false; }
+             });
+
+             appointmentSelect?.addEventListener('change', (e) => {
+                  const selectedOption = e.target.selectedOptions[0];
+                  if (selectedOption && selectedOption.value && selectedOption.dataset.appointmentData) {
+                      try {
+                          const appData = JSON.parse(selectedOption.dataset.appointmentData);
+                          console.log("Cita seleccionada:", appData);
+                          // Lógica para auto-llenar items basada en appData (más compleja)
+                          // Por ahora, solo añadimos una línea genérica
+                          addInvoiceItemRow(`Servicio Cita #${appData.AppointmentID}: ${appData.ServiceType}`, 1, 0); // Precio 0
+                      } catch (parseError) {
+                          console.error("Error parseando datos de cita:", parseError);
+                      }
+                  }
+             });
+
+             async function loadServiceCatalog() {
+                serviceCatalogListDiv.innerHTML = '<p class="text-center text-gray-500">Cargando...</p>';
+                serviceCatalogSearchInput.value = ''; // Limpiar búsqueda
+                 try {
+                     serviceCatalogData = await apiFetch('/api/services'); // Llama a la API
+                     renderServiceCatalog(serviceCatalogData);
+                 } catch (error) { serviceCatalogListDiv.innerHTML = '<p class="text-center text-red-500">Error al cargar.</p>'; }
+             }
+             function renderServiceCatalog(services) {
+                serviceCatalogListDiv.innerHTML = '';
+                if (!services || services.length === 0) { serviceCatalogListDiv.innerHTML = '<p class="text-center text-gray-500">No hay servicios.</p>'; return; }
+                services.forEach(service => {
+                    const div = document.createElement('div');
+                    div.classList.add('flex', 'items-center', 'justify-between', 'p-1', 'hover:bg-gray-100', 'rounded');
+                    div.innerHTML = `
+                        <label class="flex items-center space-x-2 text-sm cursor-pointer flex-grow mr-2">
+                            <input type="checkbox" class="form-checkbox h-4 w-4 service-catalog-checkbox" value="${service.ServiceID}" data-name="${service.Name}" data-price="${service.DefaultPrice || 0}">
+                            <span>${service.Name}</span>
+                        </label>
+                        <span class="text-sm text-gray-600 font-mono">$${(service.DefaultPrice || 0).toFixed(2)}</span>`;
+                    serviceCatalogListDiv.appendChild(div);
+                });
+            }
+            serviceCatalogSearchInput?.addEventListener('input', (e) => {
+               const searchTerm = e.target.value.toLowerCase();
+               const filteredServices = serviceCatalogData.filter(s => s.Name.toLowerCase().includes(searchTerm));
+               renderServiceCatalog(filteredServices);
+            });
+            addSelectedServicesBtn?.addEventListener('click', () => {
+                const selectedCheckboxes = serviceCatalogListDiv.querySelectorAll('.service-catalog-checkbox:checked');
+                selectedCheckboxes.forEach(chk => { addInvoiceItemRow(chk.dataset.name, 1, parseFloat(chk.dataset.price)); chk.checked = false; });
+                calculateInvoiceTotals(); hideModal('serviceCatalogModal');
+            });
+
+            // Enviar Formulario Nueva Factura
+            newInvoiceForm?.addEventListener('submit', async (e) => {
+                 e.preventDefault(); newInvoiceFeedbackDiv.textContent = ''; hideApiError();
+                 const formData = new FormData(newInvoiceForm); const items = [];
+                 const descriptions = formData.getAll('itemDescription[]');
+                 const quantities = formData.getAll('itemQuantity[]'); const prices = formData.getAll('itemPrice[]');
+
+                 for(let i = 0; i < descriptions.length; i++) {
+                     if(descriptions[i].trim()) {
+                         const quantity = parseInt(quantities[i] || '1'); const unitPrice = parseFloat(prices[i] || '0');
+                         if (isNaN(quantity) || quantity <= 0 || isNaN(unitPrice) || unitPrice < 0) {
+                             newInvoiceFeedbackDiv.textContent = `Error en la línea ${i + 1}: Cantidad o Precio inválido.`; return;
+                         }
+                         items.push({ description: descriptions[i], quantity, unitPrice });
+                     }
+                 }
+                 if (items.length === 0) { newInvoiceFeedbackDiv.textContent = 'Añada al menos un item.'; return; }
+
+                 const invoiceData = {
+                     userId: parseInt(formData.get('userId')), appointmentId: formData.get('appointmentId') ? parseInt(formData.get('appointmentId')) : null,
+                     discount: formData.get('discount') || '0', taxRate: parseFloat(formData.get('taxRate') || '0'),
+                     status: formData.get('status'), items: items
+                 };
+                 if (isNaN(invoiceData.userId) || !invoiceData.userId) { newInvoiceFeedbackDiv.textContent = 'Seleccione un cliente.'; return; }
+
+                 console.log("Enviando nueva factura:", invoiceData);
+                 submitNewInvoiceBtn.disabled = true; submitNewInvoiceBtn.classList.add('saving-indicator'); submitNewInvoiceBtn.textContent = 'Generando';
+                 try {
+                     const createdInvoice = await apiFetch('/api/invoices', { method: 'POST', body: JSON.stringify(invoiceData) });
+                     console.log("Factura creada:", createdInvoice);
+                     hideModal('newInvoiceModal');
+                     alert(`Factura #${createdInvoice.invoice?.InvoiceID || 'Nueva'} generada con éxito.`);
+                     loadAdminInvoices(); loadBillingSummary(); // Recargar tabla y resumen
+                 } catch (error) { newInvoiceFeedbackDiv.textContent = `Error: ${error.message || 'No se pudo generar.'}`; }
+                 finally { submitNewInvoiceBtn.disabled = false; submitNewInvoiceBtn.classList.remove('saving-indicator'); submitNewInvoiceBtn.textContent = 'Generar Factura'; }
+            });
+
+            // --- Lógica Tabla Admin ---
+            async function loadAdminInvoices() {
+                 loadingInvoicesRow.style.display = ''; noAdminInvoicesDiv.classList.add('hidden');
+                 adminInvoicesTableBody.innerHTML = ''; adminInvoicesTableBody.appendChild(loadingInvoicesRow);
+                 hideApiError();
+                 try {
+                     const params = new URLSearchParams();
+                     const searchTerm = invoiceSearchInput.value.trim();
+                     const statusFilter = invoiceStatusFilter.value;
+                     if (searchTerm) params.append('search', searchTerm);
+                     if (statusFilter) params.append('status', statusFilter);
+
+                     const invoices = await apiFetch(`/api/invoices?${params.toString()}`); // Llama a la API con filtros
+                     loadingInvoicesRow.style.display = 'none';
+                     if (invoices && invoices.length > 0) {
+                         adminInvoicesTableBody.innerHTML = '';
+                         invoices.forEach(renderAdminInvoiceRow);
+                     } else {
+                         adminInvoicesTableBody.innerHTML = '';
+                         noAdminInvoicesDiv.classList.remove('hidden');
+                     }
+                 } catch (error) {
+                     loadingInvoicesRow.style.display = 'none';
+                     adminInvoicesTableBody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-red-500">Error al cargar facturas.</td></tr>`;
+                 }
+            }
+
+             function renderAdminInvoiceRow(invoice) {
+                 const invoiceDate = new Date(invoice.InvoiceDate).toLocaleDateString('es-MX', {dateStyle: 'short'});
+                 let statusHTML = '';
+                 switch(invoice.Status?.toLowerCase()) {
+                    case 'paid': statusHTML = '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Pagada</span>'; break;
+                    case 'pending': statusHTML = '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">Pendiente</span>'; break;
+                    case 'overdue': statusHTML = '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Vencida</span>'; break;
+                    case 'cancelled': statusHTML = '<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">Anulada</span>'; break;
+                    default: statusHTML = `<span class="text-xs">${invoice.Status || 'Desconocido'}</span>`;
+                 }
+                 const invoiceNumber = `#INV-${String(invoice.InvoiceID).padStart(3, '0')}`;
+                 const rowHTML = `
+                     <tr class="hover:bg-gray-50" data-invoice-id="${invoice.InvoiceID}">
+                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${invoiceNumber}</td>
+                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${invoice.User?.FullName || 'N/A'}</td>
+                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${invoiceDate}</td>
+                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">$${(invoice.TotalAmount || 0).toFixed(2)}</td>
+                         <td class="px-6 py-4 whitespace-nowrap">${statusHTML}</td>
+                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                             <button class="text-blue-600 hover:text-blue-800 mr-3 view-invoice-btn" title="Ver Detalles">Ver</button>
+                             ${invoice.Status !== 'cancelled' && invoice.Status !== 'paid' ? '<button class="text-red-600 hover:text-red-800 cancel-invoice-btn" title="Marcar como Anulada">Anular</button>' : ''}
+                         </td>
+                     </tr>`;
+                 adminInvoicesTableBody.insertAdjacentHTML('beforeend', rowHTML);
+             }
+
+            // Listener para filtros
+             filterInvoicesBtn?.addEventListener('click', loadAdminInvoices);
+             invoiceSearchInput?.addEventListener('keypress', (e) => { if (e.key === 'Enter') loadAdminInvoices(); }); // Buscar al presionar Enter
+             invoiceStatusFilter?.addEventListener('change', loadAdminInvoices); // Filtrar al cambiar status
+
+             // TODO: Listeners para acciones de la tabla admin (Ver, Editar, Email, Anular)
+              adminInvoicesTableBody.addEventListener('click', async (e) => {
+                 const target = e.target;
+                 const row = target.closest('tr');
+                 if (!row) return;
+                 const invoiceId = row.dataset.invoiceId;
+
+                 if (target.classList.contains('view-invoice-btn')) {
+                     alert(`Funcionalidad VER Factura #${invoiceId} no implementada.\n(Necesita GET /api/invoices/${invoiceId})`);
+                 } else if (target.classList.contains('edit-invoice-btn')) {
+                      alert(`Funcionalidad EDITAR Factura #${invoiceId} no implementada.\n(Necesita PUT /api/invoices/${invoiceId})`);
+                 } else if (target.classList.contains('email-invoice-btn')) {
+                      alert(`Funcionalidad EMAIL Factura #${invoiceId} no implementada.\n(Necesita POST /api/invoices/${invoiceId}/email ?)`);
+                 } else if (target.classList.contains('cancel-invoice-btn')) {
+                     if (confirm(`¿Está seguro que desea ANULAR la Factura #${invoiceId}? Esto usualmente no se puede deshacer.`)) {
+                         target.disabled = true; target.textContent = 'Anulando...';
+                         try {
+                             // **NECESITAS API ENDPOINT:** ej. PATCH /api/invoices/{id}/status
+                             // await apiFetch(`/api/invoices/${invoiceId}/status`, { method: 'PATCH', body: JSON.stringify({ status: 'cancelled' }) });
+                             await new Promise(r=>setTimeout(r,500)); // Simular
+                             alert(`Factura #${invoiceId} anulada (Simulación).`);
+                             loadAdminInvoices(); // Recargar
+                             loadBillingSummary(); // Actualizar resumen
+                         } catch (error) {
+                             alert(`Error al anular factura: ${error.message}`);
+                             target.disabled = false; target.textContent = 'Anular';
+                         }
+                     }
+                 }
+             });
+
+
+             // --- Lógica Resumen Admin ---
+             async function loadBillingSummary() {
+                 totalInvoicesSpan.textContent = '...'; pendingInvoicesSpan.textContent = '...';
+                 overdueInvoicesSpan.textContent = '...'; revenueSpan.textContent = '$ ...';
+                 try {
+                    const summary = await apiFetch('/api/billing/summary'); // Llama a la API
+                    totalInvoicesSpan.textContent = summary.total || 0;
+                    pendingInvoicesSpan.textContent = summary.pending || 0;
+                    overdueInvoicesSpan.textContent = summary.overdue || 0; // Ajustar si API calcula overdue
+                    revenueSpan.textContent = `$${(summary.revenue || 0).toFixed(2)}`;
+                 } catch(error) {
+                    totalInvoicesSpan.textContent = 'Error'; pendingInvoicesSpan.textContent = 'Error';
+                    overdueInvoicesSpan.textContent = 'Error'; revenueSpan.textContent = 'Error';
+                 }
+             }
+
+            // --- Inicialización Admin ---
+            document.getElementById('current-year-admin-billing').textContent = new Date().getFullYear();
+            loadAdminInvoices(); // Carga inicial tabla admin
+            loadBillingSummary(); // Carga inicial resumen admin
+
+        });
+    </script>
+
+</body>
+</html>
