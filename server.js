@@ -995,313 +995,371 @@ app.post('/api/feedback', async (req, res) => {
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
 // ---------- INICIO SECCIÓN BILLING API (server.js) ----------
+// =======================================================================
+//  INICIO - BLOQUE COMPLETO Y CORREGIDO DE RUTAS API PARA BILLING (server.js)
+// =======================================================================
+
+// Asegúrate de tener estas líneas al principio de tu server.js si no están ya
+const express = require("express");
+const sql = require("mssql");
+const cors = require("cors");
+const bodyParser = require("body-parser");
+const PDFDocument = require('pdfkit'); // NECESITAS: npm install pdfkit
+
+// Asume que 'app' y 'pool' ya están definidos e inicializados correctamente antes de estas rutas.
 
 // --- Rutas de Catálogo de Servicios ---
 app.get('/api/services', async (req, res) => {
-  // #swagger.tags = ['Services']
-  // #swagger.summary = 'Obtener lista de servicios del catálogo'
-  if (!pool) { return res.status(500).json({ message: "Error interno: Conexión no lista." }); }
-  try {
-      const request = pool.request();
-      // Asegúrate que los nombres de columna coincidan con tu tabla Services
-      const result = await request.query("SELECT ServiceID, Name, Description, DefaultPrice FROM Services ORDER BY Name");
-      res.json(result.recordset);
-  } catch (error) {
-      console.error("Error en GET /api/services:", error.message);
-      res.status(500).json({ message: "Error interno al obtener servicios." });
-  }
+    // #swagger.tags = ['Services']
+    // #swagger.summary = 'Obtener lista de servicios del catálogo'
+    if (!pool) { return res.status(500).json({ message: "Error interno: Conexión no lista." }); }
+    try {
+        const request = pool.request();
+        const result = await request.query("SELECT ServiceID, Name, Description, DefaultPrice FROM Services ORDER BY Name");
+        res.json(result.recordset);
+    } catch (error) {
+        console.error("Error en GET /api/services:", error.message);
+        res.status(500).json({ message: "Error interno al obtener servicios." });
+    }
 });
 
-// --- Rutas de Usuarios (Necesaria para Dropdown Clientes) ---
+// --- Rutas de Usuarios (Dependencia para Facturación) ---
 app.get('/api/users', async (req, res) => {
-   // #swagger.tags = ['Users']
-   // #swagger.summary = '(Dependencia Billing) Obtener lista de usuarios (clientes) con opción de búsqueda'
-  if (!pool) { return res.status(500).json({ message: "Error interno: Conexión no lista." }); }
-  const { search } = req.query;
-  try {
-      let query = `SELECT ID, FullName, Email, PhoneNumber FROM Users WHERE 1=1 `; // Excluye Password
-      const request = pool.request();
-      if (search) { query += " AND (FullName LIKE @Search OR Email LIKE @Search)"; request.input('Search', sql.NVarChar, `%${search}%`); }
-      query += " ORDER BY FullName;";
-      const result = await request.query(query);
-      res.json(result.recordset);
-  } catch (error) {
-      console.error("Error en GET /api/users:", error.message);
-      res.status(500).json({ message: "Error al buscar usuarios." });
-  }
+    // #swagger.tags = ['Users']
+    // #swagger.summary = '(Dependencia Billing) Obtener lista de usuarios (clientes) con opción de búsqueda'
+    if (!pool) { return res.status(500).json({ message: "Error interno: Conexión no lista." }); }
+    const { search } = req.query;
+    try {
+        let query = `SELECT ID, FullName, Email, PhoneNumber FROM Users WHERE 1=1 `;
+        const request = pool.request();
+        if (search) { query += " AND (FullName LIKE @Search OR Email LIKE @Search)"; request.input('Search', sql.NVarChar, `%${search}%`); }
+        query += " ORDER BY FullName;";
+        const result = await request.query(query);
+        res.json(result.recordset);
+    } catch (error) {
+        console.error("Error en GET /api/users:", error.message);
+        res.status(500).json({ message: "Error al buscar usuarios." });
+    }
 });
 
-// --- Rutas de Citas (Necesaria para Dropdown Citas Asociadas) ---
+// --- Rutas de Citas (Dependencia para Facturación) ---
 app.get('/api/appointments', async (req, res) => {
-  // #swagger.tags = ['Appointments']
-  // #swagger.summary = '(Dependencia Billing) Obtener citas, opcionalmente filtradas por usuario y estado'
-  if (!pool) { return res.status(500).json({ message: "Error DB" }); }
-  const { status, userId } = req.query;
+    // #swagger.tags = ['Appointments']
+    // #swagger.summary = '(Dependencia Billing) Obtener citas, opcionalmente filtradas por usuario y estado'
+    if (!pool) { return res.status(500).json({ message: "Error DB" }); }
+    const { status, userId } = req.query;
 
-  try {
-      let query = `
-          SELECT
-              A.AppointmentID, A.UserID, A.AppointmentDateTime, A.VehicleDescription,
-              A.ServiceType, A.Status, A.Notes, A.CreatedAt, A.UpdatedAt,
-              U.FullName AS ClientFullName,
-              SF.FeedbackID, SF.Rating AS FeedbackRating, SF.Comments AS FeedbackComments, SF.SubmittedAt AS FeedbackSubmittedAt
-          FROM Appointments A
-          LEFT JOIN Users U ON A.UserID = U.ID
-          LEFT JOIN ServiceFeedback SF ON A.AppointmentID = SF.AppointmentID
-          WHERE 1=1
-      `;
-      const request = pool.request();
-      const conditions = [];
+    try {
+        let query = `
+            SELECT A.*, U.FullName AS ClientFullName,
+                   SF.FeedbackID, SF.Rating AS FeedbackRating, SF.Comments AS FeedbackComments, SF.SubmittedAt AS FeedbackSubmittedAt
+            FROM Appointments A
+            LEFT JOIN Users U ON A.UserID = U.ID
+            LEFT JOIN ServiceFeedback SF ON A.AppointmentID = SF.AppointmentID
+            WHERE 1=1`;
+        const request = pool.request();
+        const conditions = [];
+        if (status) { conditions.push("A.Status = @Status"); request.input('Status', sql.NVarChar, status); }
+        if (userId && !isNaN(parseInt(userId))) { conditions.push("A.UserID = @UserID"); request.input('UserID', sql.Int, parseInt(userId)); }
+        if (conditions.length > 0) { query += " AND " + conditions.join(" AND "); }
+        query += " ORDER BY A.AppointmentDateTime DESC;";
 
-      if (status) { conditions.push("A.Status = @Status"); request.input('Status', sql.NVarChar, status); }
-      // IMPORTANTE: Este filtro userId ahora sí funciona con el código frontend más reciente
-      if (userId && !isNaN(parseInt(userId))) { conditions.push("A.UserID = @UserID"); request.input('UserID', sql.Int, parseInt(userId)); }
-
-      if (conditions.length > 0) { query += " AND " + conditions.join(" AND "); }
-      query += " ORDER BY A.AppointmentDateTime DESC;";
-
-      const result = await request.query(query);
-      const appointments = result.recordset.map(app => ({
-          AppointmentID: app.AppointmentID, UserID: app.UserID, AppointmentDateTime: app.AppointmentDateTime,
-          VehicleDescription: app.VehicleDescription, ServiceType: app.ServiceType, Status: app.Status,
-          Notes: app.Notes, CreatedAt: app.CreatedAt, UpdatedAt: app.UpdatedAt,
-          User: { FullName: app.ClientFullName },
-          // Mapeo completo de Feedback
-          Feedback: app.FeedbackID ? {
-              FeedbackID: app.FeedbackID,
-              Rating: app.FeedbackRating,
-              Comments: app.FeedbackComments,
-              SubmittedAt: app.FeedbackSubmittedAt
-           } : null
-      }));
-      res.json(appointments);
-  } catch (error) {
-      console.error("Error en GET /api/appointments:", error.message);
-      res.status(500).json({ message: "Error interno al obtener citas." });
-  }
+        const result = await request.query(query);
+        const appointments = result.recordset.map(app => ({
+            ...(({ ClientFullName, FeedbackID, FeedbackRating, FeedbackComments, FeedbackSubmittedAt, ...rest }) => rest)(app)), // Copia segura
+            User: { FullName: app.ClientFullName },
+            Feedback: app.FeedbackID ? { FeedbackID: app.FeedbackID, Rating: app.FeedbackRating, Comments: app.FeedbackComments, SubmittedAt: app.FeedbackSubmittedAt } : null
+        }));
+        res.json(appointments);
+    } catch (error) {
+        console.error("Error en GET /api/appointments:", error.message);
+        res.status(500).json({ message: "Error interno al obtener citas." });
+    }
 });
 
 
 // --- Rutas de Facturación (Invoices & Billing) ---
 
-// GET /api/billing/summary - Obtener resumen para tarjetas admin
+// GET /api/billing/summary - Obtener resumen
 app.get('/api/billing/summary', async (req, res) => {
-  // #swagger.tags = ['Billing']
-  // #swagger.summary = 'Obtener resumen de facturación para dashboard admin'
-  if (!pool) { return res.status(500).json({ message: "Error DB" }); }
-  try {
-      const statusQuery = `SELECT Status, COUNT(*) AS Count, SUM(CASE WHEN Status = 'paid' THEN TotalAmount ELSE 0 END) AS AmountSum FROM Invoices GROUP BY Status;`;
-      // Asume que existe DueDate para calcular vencidas correctamente
-      const overdueQuery = `SELECT COUNT(*) AS OverdueCount FROM Invoices WHERE Status = 'pending' AND DueDate IS NOT NULL AND DueDate < GETDATE();`;
-      const requestStatus = pool.request(); const requestOverdue = pool.request();
-      const [statusResult, overdueResult] = await Promise.all([ requestStatus.query(statusQuery), requestOverdue.query(overdueQuery) ]);
-
-      const summary = { total: 0, pending: 0, overdue: 0, paid: 0, cancelled: 0, revenue: 0.00 };
-      statusResult.recordset.forEach(row => {
-          summary.total += row.Count; const statusKey = row.Status?.toLowerCase();
-          if (statusKey && summary.hasOwnProperty(statusKey)) summary[statusKey] = row.Count;
-          if (statusKey === 'paid') summary.revenue = parseFloat(row.AmountSum || 0);
-      });
-      summary.overdue = overdueResult.recordset[0]?.OverdueCount || 0; // Usa el conteo real
-      res.json(summary);
-  } catch (error) {
-      console.error("Error en GET /api/billing/summary:", error.message);
-      res.status(500).json({ message: "Error interno al obtener resumen de facturación." });
-  }
+    // #swagger.tags = ['Billing']
+    // #swagger.summary = 'Obtener resumen de facturación para dashboard admin'
+    if (!pool) { return res.status(500).json({ message: "Error DB" }); }
+    try {
+        const statusQuery = `SELECT Status, COUNT(*) AS Count, SUM(CASE WHEN Status = 'paid' THEN TotalAmount ELSE 0 END) AS AmountSum FROM Invoices GROUP BY Status;`;
+        const overdueQuery = `SELECT COUNT(*) AS OverdueCount FROM Invoices WHERE Status = 'pending' AND DueDate IS NOT NULL AND DueDate < GETDATE();`; // Requiere DueDate
+        const requestStatus = pool.request(); const requestOverdue = pool.request();
+        const [statusResult, overdueResult] = await Promise.all([ requestStatus.query(statusQuery), requestOverdue.query(overdueQuery) ]);
+        const summary = { total: 0, pending: 0, overdue: 0, paid: 0, cancelled: 0, revenue: 0.00 };
+        statusResult.recordset.forEach(row => { summary.total += row.Count; const statusKey = row.Status?.toLowerCase(); if (statusKey && summary.hasOwnProperty(statusKey)) summary[statusKey] = row.Count; if (statusKey === 'paid') summary.revenue = parseFloat(row.AmountSum || 0); });
+        summary.overdue = overdueResult.recordset[0]?.OverdueCount || 0;
+        res.json(summary);
+    } catch (error) {
+        console.error("Error en GET /api/billing/summary:", error.message);
+        res.status(500).json({ message: "Error interno al obtener resumen." });
+    }
 });
 
 // GET /api/invoices - Obtener lista de facturas (con filtros)
 app.get('/api/invoices', async (req, res) => {
- // #swagger.tags = ['Invoices']
- // ... (swagger params igual que antes) ...
- if (!pool) { return res.status(500).json({ message: "Error DB" }); }
- const { search, status, startDate, endDate, userId } = req.query;
- try {
-    let query = `
-        SELECT
-            I.InvoiceID, I.UserID, I.InvoiceDate, I.DueDate, I.TotalAmount, I.Status,
-            U.FullName AS ClientFullName
-        FROM Invoices I
-        LEFT JOIN Users U ON I.UserID = U.ID
-        WHERE 1=1
-    `;
-    const request = pool.request(); const conditions = [];
-    if (status) { conditions.push("I.Status = @Status"); request.input('Status', sql.NVarChar, status); }
-    if (search) {
-        conditions.push(`(CAST(I.InvoiceID AS NVARCHAR(20)) = @SearchExact OR U.FullName LIKE @SearchPattern OR U.Email LIKE @SearchPattern)`);
-        let searchExact = search.toUpperCase().startsWith('#INV-') ? search.substring(5) : search; if (!/^\d+$/.test(searchExact)) searchExact = '-1';
-        request.input('SearchExact', sql.NVarChar, searchExact); request.input('SearchPattern', sql.NVarChar, `%${search}%`);
-    }
-    if (startDate) { conditions.push("I.InvoiceDate >= @StartDate"); request.input('StartDate', sql.Date, startDate); }
-    if (endDate) { conditions.push("I.InvoiceDate <= @EndDate"); request.input('EndDate', sql.Date, endDate); }
-    if (userId && !isNaN(parseInt(userId))) { conditions.push("I.UserID = @UserID"); request.input('UserID', sql.Int, parseInt(userId)); }
-    if (conditions.length > 0) { query += " AND " + conditions.join(" AND "); }
-    query += " ORDER BY I.InvoiceDate DESC;";
-    const result = await request.query(query);
-    const invoices = result.recordset.map(inv => ({ ...inv, User: { FullName: inv.ClientFullName || null } }));
-    res.json(invoices);
- } catch (error) {
-    console.error("Error en GET /api/invoices:", error.message);
-    res.status(500).json({ message: "Error interno al obtener facturas." });
- }
+   // #swagger.tags = ['Invoices']
+   // ... (swagger params) ...
+   if (!pool) { return res.status(500).json({ message: "Error DB" }); }
+   const { search, status, startDate, endDate, userId } = req.query;
+   try {
+      let query = `SELECT I.InvoiceID, I.UserID, I.InvoiceDate, I.DueDate, I.TotalAmount, I.Status, U.FullName AS ClientFullName FROM Invoices I LEFT JOIN Users U ON I.UserID = U.ID WHERE 1=1`;
+      const request = pool.request(); const conditions = [];
+      if (status) { conditions.push("I.Status = @Status"); request.input('Status', sql.NVarChar, status); }
+      if (search) { conditions.push(`(CAST(I.InvoiceID AS NVARCHAR(20)) = @SearchExact OR U.FullName LIKE @SearchPattern OR U.Email LIKE @SearchPattern)`); let searchExact = search.toUpperCase().startsWith('#INV-') ? search.substring(5) : search; if (!/^\d+$/.test(searchExact)) searchExact = '-1'; request.input('SearchExact', sql.NVarChar, searchExact); request.input('SearchPattern', sql.NVarChar, `%${search}%`); }
+      if (startDate) { conditions.push("I.InvoiceDate >= @StartDate"); request.input('StartDate', sql.Date, startDate); }
+      if (endDate) { conditions.push("I.InvoiceDate <= @EndDate"); request.input('EndDate', sql.Date, endDate); }
+      if (userId && !isNaN(parseInt(userId))) { conditions.push("I.UserID = @UserID"); request.input('UserID', sql.Int, parseInt(userId)); }
+      if (conditions.length > 0) { query += " AND " + conditions.join(" AND "); }
+      query += " ORDER BY I.InvoiceDate DESC;";
+      const result = await request.query(query);
+      const invoices = result.recordset.map(inv => ({ ...inv, User: { FullName: inv.ClientFullName || null } }));
+      res.json(invoices);
+   } catch (error) {
+      console.error("Error en GET /api/invoices:", error.message);
+      res.status(500).json({ message: "Error interno al obtener facturas." });
+   }
 });
 
-// POST /api/invoices - Crear nueva factura (CON CÁLCULO CORREGIDO)
+// POST /api/invoices - Crear nueva factura
 app.post('/api/invoices', async (req, res) => {
-  // #swagger.tags = ['Invoices']
-  // ... (swagger params igual que antes) ...
-  if (!pool) { return res.status(500).json({ message: "Error DB" }); }
-  const { userId, appointmentId, discount, taxRate, status, items } = req.body;
+    // #swagger.tags = ['Invoices']
+    // ... (swagger params) ...
+    if (!pool) { return res.status(500).json({ message: "Error DB" }); }
+    const { userId, appointmentId, discount, taxRate, status, items } = req.body;
 
-  // Validación más robusta
-  const errors = [];
-  if (!userId || isNaN(parseInt(userId))) errors.push("UserID inválido o faltante.");
-  if (!status || !['pending', 'paid'].includes(status.toLowerCase())) errors.push("Estado inválido (debe ser 'pending' o 'paid').");
-  if (!items || !Array.isArray(items) || items.length === 0) errors.push("Se requiere al menos un item.");
-  else {
-      items.forEach((item, index) => {
-          if (!item.description?.trim()) errors.push(`Item ${index + 1}: Descripción requerida.`);
-          const quantity = parseInt(item.quantity || '1');
-          const unitPrice = parseFloat(item.unitPrice || '0');
-          if (isNaN(quantity) || quantity <= 0) errors.push(`Item ${index + 1} (${item.description || ''}): Cantidad inválida.`);
-          if (isNaN(unitPrice) || unitPrice < 0) errors.push(`Item ${index + 1} (${item.description || ''}): Precio Unitario inválido.`);
-      });
-  }
-  if (errors.length > 0) { return res.status(400).json({ message: "Errores de validación.", errors }); }
+    // Validación robusta
+    const errors = [];
+    if (!userId || isNaN(parseInt(userId))) { errors.push("UserID inválido o faltante."); }
+    if (!status || !['pending', 'paid'].includes(status.toLowerCase())) { errors.push("Estado inválido (debe ser 'pending' o 'paid')."); }
+    if (!items || !Array.isArray(items) || items.length === 0) { errors.push("Se requiere al menos un item."); }
+    else {
+        items.forEach((item, index) => {
+            if (!item.description?.trim()) { errors.push(`Item ${index + 1}: Descripción requerida.`); }
+            const quantity = parseInt(item.quantity || '1');
+            const unitPrice = parseFloat(item.unitPrice || '0');
+            if (isNaN(quantity) || quantity <= 0) { errors.push(`Item ${index + 1} (${item.description || ''}): Cantidad inválida (${item.quantity}).`); }
+            if (isNaN(unitPrice) || unitPrice < 0) { errors.push(`Item ${index + 1} (${item.description || ''}): Precio Unitario inválido (${item.unitPrice}).`); }
+        });
+    }
+    if (errors.length > 0) { return res.status(400).json({ message: "Errores de validación.", errors }); }
 
-  let transaction;
-  try {
-      transaction = pool.transaction(); await transaction.begin();
-      console.log("--- Iniciando Transacción Creación Factura ---");
+    let transaction;
+    try {
+        transaction = pool.transaction(); await transaction.begin();
+        console.log("--- Iniciando Transacción Creación Factura ---");
 
-      // 1. **** CORRECCIÓN: Calcular Totales CORRECTAMENTE ****
-      let subtotal = 0;
-      console.log("--- Calculando Subtotal de Items ---");
-      items.forEach((item, index) => {
-          const quantity = parseInt(item.quantity || '1');
-          const unitPrice = parseFloat(item.unitPrice || '0');
-          // Asegurarse de que sean números válidos antes de sumar
-          if (!isNaN(quantity) && !isNaN(unitPrice)) {
-               console.log(`  Item ${index + 1}: Qty=${quantity}, Price=${unitPrice}, LineTotal=${quantity * unitPrice}`);
-               subtotal += quantity * unitPrice;
-          } else {
-              // Esto ya no debería pasar por la validación inicial, pero es una salvaguarda
-               console.warn(`Item ${index + 1} con valores inválidos, omitido del subtotal.`);
-          }
-      });
+        // 1. Calcular Totales CORRECTAMENTE
+        let subtotal = 0;
+        console.log("--- Calculando Subtotal de Items ---");
+        items.forEach((item, index) => {
+            const quantity = parseInt(item.quantity || '1'); const unitPrice = parseFloat(item.unitPrice || '0');
+            if (!isNaN(quantity) && !isNaN(unitPrice)) { console.log(`  Item ${index + 1}: Qty=${quantity}, Price=${unitPrice.toFixed(2)}, LineTotal=${(quantity * unitPrice).toFixed(2)}`); subtotal += quantity * unitPrice; }
+        });
+        let discountAmount = 0; const discountValue = discount || '0';
+        if (typeof discountValue === 'string' && discountValue.endsWith('%')) { const percent = parseFloat(discountValue.replace('%', '')) || 0; discountAmount = subtotal * (percent / 100); }
+        else { discountAmount = parseFloat(discountValue) || 0; }
+        discountAmount = Math.max(0, discountAmount);
+        const subtotalAfterDiscount = Math.max(0, subtotal - discountAmount); const taxRatePercent = parseFloat(taxRate || '0'); const taxAmount = subtotalAfterDiscount * (taxRatePercent / 100);
+        const totalAmount = subtotalAfterDiscount + taxAmount;
+        console.log(`--- Totales Calculados --- [...] >>> Monto Total Final: ${totalAmount.toFixed(2)}`); // Log resumido
+        if (isNaN(totalAmount) || totalAmount < 0) { throw new Error("Error cálculo total."); }
+        const invoiceDate = new Date(); const dueDate = new Date(invoiceDate); dueDate.setDate(dueDate.getDate() + 30);
 
-      let discountAmount = 0;
-      const discountValue = discount || '0';
-      if (typeof discountValue === 'string' && discountValue.endsWith('%')) {
-          const percent = parseFloat(discountValue.replace('%', '')) || 0;
-          discountAmount = subtotal * (percent / 100);
-      } else {
-          discountAmount = parseFloat(discountValue) || 0;
-      }
-      // Validar que el descuento no sea negativo
-      discountAmount = Math.max(0, discountAmount);
+        // 2. Insertar en Invoices
+        const invoiceRequest = transaction.request();
+        invoiceRequest.input('UserID', sql.Int, userId); invoiceRequest.input('AppointmentID', sql.Int, appointmentId || null); invoiceRequest.input('InvoiceDate', sql.DateTime2, invoiceDate); invoiceRequest.input('DueDate', sql.DateTime2, dueDate);
+        invoiceRequest.input('Subtotal', sql.Decimal(10, 2), subtotal); invoiceRequest.input('Discount', sql.Decimal(10, 2), discountAmount); invoiceRequest.input('TaxAmount', sql.Decimal(10, 2), taxAmount);
+        invoiceRequest.input('TotalAmount', sql.Decimal(10, 2), totalAmount); // <-- VALOR CALCULADO
+        invoiceRequest.input('Status', sql.NVarChar, status.toLowerCase());
+        const invoiceQuery = `INSERT INTO Invoices ([UserID], [AppointmentID], [InvoiceDate], [DueDate], [Subtotal], [Discount], [TaxAmount], [TotalAmount], [Status]) OUTPUT INSERTED.InvoiceID, INSERTED.TotalAmount, INSERTED.Status, INSERTED.InvoiceDate, INSERTED.UserID, INSERTED.DueDate VALUES (@UserID, @AppointmentID, @InvoiceDate, @DueDate, @Subtotal, @Discount, @TaxAmount, @TotalAmount, @Status);`;
+        const invoiceResult = await invoiceRequest.query(invoiceQuery); const newInvoiceId = invoiceResult.recordset[0].InvoiceID; const createdInvoiceHeader = invoiceResult.recordset[0];
+        console.log(`--- Inserción Invoices OK (ID: ${newInvoiceId}, Total Insertado: ${createdInvoiceHeader.TotalAmount}) ---`);
 
-      const subtotalAfterDiscount = Math.max(0, subtotal - discountAmount); // Evitar negativo
-      const taxRatePercent = parseFloat(taxRate || '0');
-      const taxAmount = subtotalAfterDiscount * (taxRatePercent / 100);
-      const totalAmount = subtotalAfterDiscount + taxAmount;
+        // 3. Insertar en InvoiceItems
+        const itemRequest = transaction.request();
+        for (const item of items) {
+             const currentQuantity = parseInt(item.quantity || '1'); const currentPrice = parseFloat(item.unitPrice || '0'); const currentServiceId = item.serviceId || null; const currentDescription = item.description?.trim() || 'N/A';
+             itemRequest.input('InvoiceID_Item', sql.Int, newInvoiceId); itemRequest.input('ServiceID_Item', sql.Int, currentServiceId); itemRequest.input('Description_Item', sql.NVarChar, currentDescription);
+             itemRequest.input('Quantity_Item', sql.Int, currentQuantity); itemRequest.input('UnitPrice_Item', sql.Decimal(10, 2), currentPrice);
+             const itemQuery = `INSERT INTO InvoiceItems ([InvoiceID], [ServiceID], [Description], [Quantity], [UnitPrice]) VALUES (@InvoiceID_Item, @ServiceID_Item, @Description_Item, @Quantity_Item, @UnitPrice_Item);`;
+             await itemRequest.query(itemQuery);
+        }
+        console.log(`--- Fin inserción de items ---`);
 
-      console.log(`--- Totales Calculados ---`);
-      console.log(`Subtotal Bruto: ${subtotal.toFixed(2)}`);
-      console.log(`Descuento Aplicado: ${discountAmount.toFixed(2)} (Input: ${discountValue})`);
-      console.log(`Subtotal c/Desc: ${subtotalAfterDiscount.toFixed(2)}`);
-      console.log(`Tasa Impuesto: ${taxRatePercent}%`);
-      console.log(`Monto Impuesto: ${taxAmount.toFixed(2)}`);
-      console.log(`>>> Monto Total Final: ${totalAmount.toFixed(2)}`); // <<< Verificar este valor
-
-      // Validar que el total final sea un número válido y no negativo
-      if (isNaN(totalAmount) || totalAmount < 0) {
-           throw new Error("Error en el cálculo del monto total final. Verifique precios, cantidades, descuento e impuesto.");
-      }
-
-      const invoiceDate = new Date(); const dueDate = new Date(invoiceDate); dueDate.setDate(dueDate.getDate() + 30); // DueDate a 30 días
-
-      // 2. Insertar en Invoices (con corchetes y valor TOTAL correcto)
-      const invoiceRequest = transaction.request();
-      invoiceRequest.input('UserID', sql.Int, userId);
-      invoiceRequest.input('AppointmentID', sql.Int, appointmentId || null);
-      invoiceRequest.input('InvoiceDate', sql.DateTime2, invoiceDate);
-      invoiceRequest.input('DueDate', sql.DateTime2, dueDate);
-      invoiceRequest.input('Subtotal', sql.Decimal(10, 2), subtotal);
-      invoiceRequest.input('Discount', sql.Decimal(10, 2), discountAmount);
-      invoiceRequest.input('TaxAmount', sql.Decimal(10, 2), taxAmount);
-      invoiceRequest.input('TotalAmount', sql.Decimal(10, 2), totalAmount); // <<< Usar totalAmount calculado
-      invoiceRequest.input('Status', sql.NVarChar, status);
-      const invoiceQuery = `
-          INSERT INTO Invoices ([UserID], [AppointmentID], [InvoiceDate], [DueDate], [Subtotal], [Discount], [TaxAmount], [TotalAmount], [Status])
-          OUTPUT INSERTED.InvoiceID, INSERTED.TotalAmount, INSERTED.Status, INSERTED.InvoiceDate, INSERTED.UserID, INSERTED.DueDate
-          VALUES (@UserID, @AppointmentID, @InvoiceDate, @DueDate, @Subtotal, @Discount, @TaxAmount, @TotalAmount, @Status);`;
-      console.log("--- Ejecutando Query Invoices ---");
-      const invoiceResult = await invoiceRequest.query(invoiceQuery);
-      const newInvoiceId = invoiceResult.recordset[0].InvoiceID;
-      const createdInvoiceHeader = invoiceResult.recordset[0];
-      console.log(`--- Inserción Invoices OK (ID: ${newInvoiceId}, Total Insertado: ${createdInvoiceHeader.TotalAmount}) ---`); // Log del total insertado
-
-      // 3. Insertar en InvoiceItems (secuencialmente)
-      console.log(`--- Iniciando inserción de ${items.length} items para InvoiceID: ${newInvoiceId} ---`);
-      const itemRequest = transaction.request();
-      for (const item of items) {
-          const currentQuantity = parseInt(item.quantity || '1');
-          const currentPrice = parseFloat(item.unitPrice || '0');
-          const currentServiceId = item.serviceId || null;
-          const currentDescription = item.description?.trim() || 'N/A';
-          itemRequest.input('InvoiceID_Item', sql.Int, newInvoiceId);
-          itemRequest.input('ServiceID_Item', sql.Int, currentServiceId);
-          itemRequest.input('Description_Item', sql.NVarChar, currentDescription);
-          itemRequest.input('Quantity_Item', sql.Int, currentQuantity);
-          itemRequest.input('UnitPrice_Item', sql.Decimal(10, 2), currentPrice);
-          const itemQuery = `INSERT INTO InvoiceItems ([InvoiceID], [ServiceID], [Description], [Quantity], [UnitPrice]) VALUES (@InvoiceID_Item, @ServiceID_Item, @Description_Item, @Quantity_Item, @UnitPrice_Item);`;
-          await itemRequest.query(itemQuery);
-          console.log(`    Item '${item.description}' insertado.`);
-      }
-      console.log(`--- Fin inserción de items ---`);
-
-      // 4. Commit
-      await transaction.commit();
-      console.log(`--- Transacción completada para InvoiceID: ${newInvoiceId} ---`);
-
-      // 5. Devolver respuesta
-      res.status(201).json({ message: `Factura #${newInvoiceId} creada.`, invoice: createdInvoiceHeader });
-
-  } catch (error) {
-      console.error("Error en POST /api/invoices:", error);
-      if (transaction && transaction.active) { try { await transaction.rollback(); console.log("Rollback exitoso por error."); } catch (rbErr) { console.error("Error en Rollback:", rbErr); } }
-      res.status(500).json({ message: `Error al crear factura: ${error.originalError?.message || error.message || 'Error desconocido.'}` });
-  }
+        // 4. Commit
+        await transaction.commit();
+        console.log(`--- Transacción completada para InvoiceID: ${newInvoiceId} ---`);
+        res.status(201).json({ message: `Factura #${newInvoiceId} creada.`, invoice: createdInvoiceHeader });
+    } catch (error) {
+        console.error("Error en POST /api/invoices:", error);
+        if (transaction?.active) { try { await transaction.rollback(); console.log("Rollback por error."); } catch (rbErr) { console.error("Error en Rollback:", rbErr); } }
+        res.status(500).json({ message: `Error al crear factura: ${error.originalError?.message || error.message || 'Error desconocido.'}` });
+    }
 });
 
-// PATCH /api/invoices/:id/status - Actualizar estado (ej: 'paid', 'cancelled')
+
+// PATCH /api/invoices/:id/status - Actualizar estado
 app.patch('/api/invoices/:id/status', async (req, res) => {
- // #swagger.tags = ['Invoices']
- // ... (swagger params) ...
- if (!pool) { return res.status(500).json({ message: "Error DB" }); }
- const invoiceId = parseInt(req.params.id); const { status } = req.body;
- const validStatuses = ['pending', 'paid', 'cancelled', 'overdue'];
- if (isNaN(invoiceId)) return res.status(400).json({ message: "ID inválido." });
- if (!status || !validStatuses.includes(status.toLowerCase())) return res.status(400).json({ message: `Estado inválido.` });
-
- try {
-     const request = pool.request();
-     request.input('InvoiceID', sql.Int, invoiceId);
-     request.input('Status', sql.NVarChar, status.toLowerCase());
-     // Considera añadir una columna UpdatedAt a Invoices y actualizarla aquí
-     // request.input('UpdatedAt', sql.DateTime2, new Date());
-     // const query = `UPDATE Invoices SET Status = @Status, UpdatedAt = @UpdatedAt WHERE InvoiceID = @InvoiceID; SELECT @@ROWCOUNT AS RowsAffected;`;
-     const query = `UPDATE Invoices SET Status = @Status WHERE InvoiceID = @InvoiceID; SELECT @@ROWCOUNT AS RowsAffected;`;
-
-     const result = await request.query(query);
-     if (result.recordset[0]?.RowsAffected === 0) return res.status(404).json({ message: "Factura no encontrada." });
-     res.json({ InvoiceID: invoiceId, Status: status.toLowerCase() });
- } catch (error) {
-     console.error(`Error en PATCH /api/invoices/${invoiceId}/status:`, error.message);
-     res.status(500).json({ message: "Error interno al actualizar estado." });
- }
+   // #swagger.tags = ['Invoices']
+   // ... (swagger params) ...
+   if (!pool) { return res.status(500).json({ message: "Error DB" }); }
+   const invoiceId = parseInt(req.params.id); const { status } = req.body;
+   const validStatuses = ['pending', 'paid', 'cancelled', 'overdue'];
+   if (isNaN(invoiceId)) return res.status(400).json({ message: "ID inválido." });
+   if (!status || !validStatuses.includes(status.toLowerCase())) return res.status(400).json({ message: `Estado inválido.` });
+   try {
+       const request = pool.request(); request.input('InvoiceID', sql.Int, invoiceId); request.input('Status', sql.NVarChar, status.toLowerCase());
+       const query = `UPDATE Invoices SET Status = @Status WHERE InvoiceID = @InvoiceID; SELECT @@ROWCOUNT AS RowsAffected;`;
+       const result = await request.query(query);
+       if (result.recordset[0]?.RowsAffected === 0) return res.status(404).json({ message: "Factura no encontrada." });
+       res.json({ InvoiceID: invoiceId, Status: status.toLowerCase() });
+   } catch (error) {
+       console.error(`Error en PATCH /api/invoices/${invoiceId}/status:`, error.message);
+       res.status(500).json({ message: "Error interno al actualizar estado." });
+   }
 });
+
+// GET /api/invoices/:id - Obtener detalles de UNA factura
+app.get('/api/invoices/:id', async (req, res) => {
+    // #swagger.tags = ['Invoices']
+    // #swagger.summary = 'Obtener detalles completos de una factura específica'
+    /* #swagger.parameters['id'] = { description: 'ID de la factura', type: 'integer', required: true } */
+    if (!pool) { return res.status(500).json({ message: "Error DB" }); }
+    const invoiceId = parseInt(req.params.id); if (isNaN(invoiceId)) { return res.status(400).json({ message: "ID inválido." }); }
+    try {
+        const request = pool.request(); request.input('InvoiceID', sql.Int, invoiceId);
+        const headerQuery = `SELECT I.*, U.FullName AS ClientFullName, U.Email AS ClientEmail, U.PhoneNumber AS ClientPhone FROM Invoices I LEFT JOIN Users U ON I.UserID = U.ID WHERE I.InvoiceID = @InvoiceID;`;
+        const itemsQuery = `SELECT IT.* FROM InvoiceItems IT WHERE IT.InvoiceID = @InvoiceID ORDER BY InvoiceItemID;`;
+        const [headerResult, itemsResult] = await Promise.all([ request.query(headerQuery), request.query(itemsQuery) ]);
+        if (!headerResult.recordset?.length) { return res.status(404).json({ message: "Factura no encontrada." }); }
+        const header = headerResult.recordset[0];
+        const invoiceData = {
+            invoiceHeader: { ...( ({ClientFullName, ClientEmail, ClientPhone, ...rest}) => rest )(header), User: { FullName: header.ClientFullName, Email: header.ClientEmail, PhoneNumber: header.ClientPhone } },
+            items: itemsResult.recordset || [] };
+        res.json(invoiceData);
+    } catch (error) {
+        console.error(`Error en GET /api/invoices/${invoiceId}:`, error.message);
+        res.status(500).json({ message: "Error interno al obtener detalles." });
+    }
+});
+
+
+// GET /api/invoices/:id/download - Descargar factura como PDF
+app.get('/api/invoices/:id/download', async (req, res) => {
+    // #swagger.tags = ['Invoices']
+    // #swagger.summary = 'Generar y descargar una factura en formato PDF'
+    /* #swagger.parameters['id'] = { description: 'ID de la factura', type: 'integer', required: true } */
+    if (!pool) { return res.status(500).send("Error DB."); }
+    const invoiceId = parseInt(req.params.id); if (isNaN(invoiceId)) { return res.status(400).send("ID inválido."); }
+    try {
+        // 1. Obtener datos
+        const request = pool.request(); request.input('InvoiceID', sql.Int, invoiceId);
+        const headerQuery = `SELECT I.*, U.FullName, U.Email, U.PhoneNumber FROM Invoices I LEFT JOIN Users U ON I.UserID = U.ID WHERE I.InvoiceID = @InvoiceID;`;
+        const itemsQuery = `SELECT * FROM InvoiceItems WHERE InvoiceID = @InvoiceID ORDER BY InvoiceItemID;`;
+        const [headerResult, itemsResult] = await Promise.all([ request.query(headerQuery), request.query(itemsQuery) ]);
+        if (!headerResult.recordset?.length) { return res.status(404).send("Factura no encontrada."); }
+        const invoice = headerResult.recordset[0]; const items = itemsResult.recordset || [];
+
+        // 2. Crear PDF y configurar respuesta
+        const doc = new PDFDocument({ size: 'A4', margin: 40 });
+        const filename = `Factura-INV-${String(invoiceId).padStart(3, '0')}.pdf`;
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        doc.pipe(res);
+
+        // --- Contenido del PDF (Ajusta tus datos y diseño) ---
+        const jump = 15; const itemX = 40; const qtyX = 340; const priceX = 400; const totalX = 480; const tableRight = 555; const totalsX = 380;
+        // Emisor (¡CAMBIA ESTO!)
+        doc.fontSize(16).font('Helvetica-Bold').text('AutoCare Rodriguez', { align: 'right' }); // Alineado a la derecha ahora
+        doc.font('Helvetica').fontSize(10);
+        doc.text('Tu Dirección Aquí', { align: 'right' });
+        doc.text('Ciudad, CP', { align: 'right' });
+        doc.text('Tel: Tu Tel | Email: tu@email.com', { align: 'right' });
+        doc.moveDown(2); // Espacio
+        // Cliente y Factura Info
+        const initialY = doc.y; // Guardar Y actual
+        doc.fontSize(11).font('Helvetica-Bold').text('Facturar a:', itemX, initialY);
+        doc.font('Helvetica').fontSize(10);
+        doc.text(invoice.FullName || 'N/A', itemX, initialY + jump);
+        if (invoice.Email) doc.text(invoice.Email, itemX, initialY + jump * 2);
+        if (invoice.PhoneNumber) doc.text(invoice.PhoneNumber, itemX, initialY + jump * 3);
+        doc.fontSize(11).font('Helvetica-Bold').text(`Factura #: INV-${String(invoiceId).padStart(3, '0')}`, 350, initialY);
+        doc.font('Helvetica').fontSize(10);
+        doc.text(`Fecha Emisión: ${new Date(invoice.InvoiceDate).toLocaleDateString('es-MX')}`, 350, initialY + jump);
+        doc.text(`Vencimiento: ${invoice.DueDate ? new Date(invoice.DueDate).toLocaleDateString('es-MX') : 'N/A'}`, 350, initialY + jump * 2);
+        doc.font('Helvetica-Bold').text(`Estado: ${invoice.Status?.toUpperCase() || 'N/A'}`, 350, initialY + jump * 3);
+        doc.y = initialY + jump * 4 + 10; // Mover Y debajo de lo más largo
+
+        // --- Tabla de Items ---
+        const tableTop = doc.y; let currentY = tableTop + jump; // Ajuste inicial Y
+        // Encabezados Tabla
+        doc.font('Helvetica-Bold').fontSize(10);
+        doc.text('Descripción', itemX, tableTop, { width: qtyX - itemX - 10 }); // Ancho ajustado
+        doc.text('Cant.', qtyX, tableTop, { width: 50, align: 'right' });
+        doc.text('P. Unit.', priceX, tableTop, { width: 70, align: 'right' });
+        doc.text('Importe', totalX, tableTop, { width: 70, align: 'right' });
+        doc.moveTo(itemX, tableTop + jump * 0.8).lineTo(tableRight, tableTop + jump * 0.8).lineWidth(0.5).strokeColor("#aaaaaa").stroke(); // Línea bajo encabezados
+        // Items
+        doc.font('Helvetica').fontSize(9);
+        items.forEach(item => {
+             const itemTotal = (item.Quantity || 1) * (item.UnitPrice || 0);
+             const descHeight = doc.heightOfString(item.Description || '', { width: qtyX - itemX - 10 }); // Calcular altura texto
+             const requiredHeight = Math.max(jump * 0.8, descHeight + 5); // Altura mínima o altura del texto
+             // Salto de página si no cabe
+             if (currentY + requiredHeight > doc.page.height - doc.page.margins.bottom - 50) { // -50 para espacio de totales
+                 doc.addPage();
+                 currentY = doc.page.margins.top; // Reiniciar Y arriba
+                 // Opcional: Re-dibujar encabezados de tabla en la nueva página
+                 doc.font('Helvetica-Bold').fontSize(10).text('Descripción', itemX, currentY).text('Cant.', qtyX, currentY, { width: 50, align: 'right' }).text('P. Unit.', priceX, currentY, { width: 70, align: 'right' }).text('Importe', totalX, currentY, { width: 70, align: 'right' });
+                 currentY += jump;
+                 doc.moveTo(itemX, currentY).lineTo(tableRight, currentY).lineWidth(0.5).strokeColor("#aaaaaa").stroke();
+                 currentY += 5;
+             }
+             doc.text(item.Description || '', itemX, currentY, { width: qtyX - itemX - 10 });
+             doc.text((item.Quantity || 1).toString(), qtyX, currentY, { width: 50, align: 'right' });
+             doc.text(`$${(item.UnitPrice || 0).toFixed(2)}`, priceX, currentY, { width: 70, align: 'right' });
+             doc.text(`$${itemTotal.toFixed(2)}`, totalX, currentY, { width: 70, align: 'right' });
+             currentY += requiredHeight; // Incrementar Y basado en altura real
+        });
+        doc.moveTo(itemX, currentY).lineTo(tableRight, currentY).lineWidth(0.5).strokeColor("#aaaaaa").stroke(); // Línea final tabla
+
+        // --- Totales ---
+         // Asegurar espacio para totales
+        if (currentY > doc.page.height - doc.page.margins.bottom - 60) { // Necesita ~60 puntos para totales
+            doc.addPage();
+            currentY = doc.page.margins.top;
+        } else {
+            currentY += jump; // Espacio antes de totales
+        }
+        const totalsYStart = currentY;
+        doc.font('Helvetica').fontSize(10);
+        doc.text('Subtotal:', totalsX, totalsYStart, { width: 90, align: 'left' }); doc.text(`${formatCurrency(invoice.Subtotal)}`, totalX, totalsYStart, { width: 70, align: 'right'}); currentY += jump;
+        doc.text('Descuento:', totalsX, currentY, { width: 90, align: 'left' }); doc.text(`-${formatCurrency(invoice.Discount)}`, totalX, currentY, { width: 70, align: 'right'}); currentY += jump;
+        doc.text('Impuestos:', totalsX, currentY, { width: 90, align: 'left' }); doc.text(`+${formatCurrency(invoice.TaxAmount)}`, totalX, currentY, { width: 70, align: 'right'}); currentY += 5;
+        doc.moveTo(totalsX - 10, currentY).lineTo(tableRight, currentY).lineWidth(1).strokeColor("#000000").stroke(); currentY += 5;
+        doc.font('Helvetica-Bold').fontSize(11).text('TOTAL:', totalsX, currentY, { width: 90, align: 'left' }); doc.text(`${formatCurrency(invoice.TotalAmount)}`, totalX, currentY, { width: 70, align: 'right'});
+
+        // Notas Adicionales
+        if (invoice.Notes) {
+             if (currentY > doc.page.height - doc.page.margins.bottom - 40) { doc.addPage(); currentY = doc.page.margins.top;} else { doc.moveDown(3);}
+             doc.font('Helvetica').fontSize(9).text('Notas:', itemX);
+             doc.text(invoice.Notes, { indent: 10, width: tableRight - itemX });
+        }
+
+        // --- Fin Contenido PDF ---
+        doc.end(); // Finalizar PDF y enviar stream
+        console.log(`PDF generado para Factura #${invoiceId}`);
+    } catch (error) {
+         console.error(`Error en GET /api/invoices/${invoiceId}/download:`, error.message);
+         if (!res.headersSent) { res.status(500).send("Error al generar PDF."); } else { res.end(); }
+    }
+});
+
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
