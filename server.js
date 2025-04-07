@@ -4,6 +4,7 @@ const sql = require("mssql");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 
+
 const app = express(); // Aquí definimos "app" correctamente
 const PORT = 3000;
 
@@ -12,6 +13,7 @@ app.use(cors());
 app.use(bodyParser.json());
 app.use(express.json());
 const bcrypt = require('bcrypt');
+
 
 // Middleware (aplicar en este orden)
 app.use(cors({
@@ -24,26 +26,30 @@ app.use(cors({
 
 
 // Configuración de conexión a SQL Server
+// --- Configuración DB ---
 const dbConfig = {
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    server: process.env.DB_SERVER,
-    database: process.env.DB_DATABASE,
-    port: parseInt(process.env.DB_PORT),
-    options: {
-        encrypt: false,
-        trustServerCertificate: true
-    }
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  server: process.env.DB_SERVER,
+  database: process.env.DB_DATABASE,
+  port: parseInt(process.env.DB_PORT || '1433'), // Puerto default SQL Server
+  options: {
+      // Asegúrate que estos valores sean booleanos o strings 'true'/'false' en tu .env
+      encrypt: process.env.DB_ENCRYPT === 'true',
+      trustServerCertificate: process.env.DB_TRUST_CERT === 'true'
+  }
 };
 
-// Función para conectar a SQL Server
+// --- Función para conectar a SQL Server ---
 async function connectDB() {
-    try {
-        await sql.connect(dbConfig);
-        console.log("✅ Conectado a SQL Server");
-    } catch (err) {
-        console.error("❌ Error de conexión a SQL Server:", err);
-    }
+  try {
+      console.log("🔧 Intentando conectar a la base de datos..."); // Log de inicio
+      pool = await sql.connect(dbConfig); // Asigna la conexión a la variable 'pool'
+      console.log("✅ Conectado a SQL Server");
+  } catch (err) {
+      console.error("❌ Error de conexión a SQL Server:", err.message); // Muestra el mensaje de error
+      process.exit(1); // Detiene la aplicación si la conexión inicial falla
+  }
 }
 ////////////////////////////////////////////////////////////////////////
 //MODULO 6GENERAL
@@ -635,7 +641,288 @@ app.get('/users', async (req, res) => {
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
+//MODULO DE CITAS
+// --- Rutas de Citas (Appointments) ---
 
+// GET Todas las citas (antes era /api/appointments/all, ahora la ruta principal)
+// También puede manejar filtros opcionales
+app.get('/api/appointments', async (req, res) => { // Removido authenticateToken y isAdmin
+  const { date, client, status } = req.query;
+
+  try {
+      let query = `
+          SELECT
+              A.AppointmentID, A.UserID, A.AppointmentDateTime, A.VehicleDescription, A.ServiceType, A.Status, A.Notes, A.CreatedAt, A.UpdatedAt,
+              U.FullName AS ClientFullName
+          FROM Appointments A
+          LEFT JOIN Users U ON A.UserID = U.ID
+          WHERE 1=1
+      `;
+      const request = pool.request();
+      const conditions = [];
+
+      if (date) {
+          conditions.push("CONVERT(date, A.AppointmentDateTime) = @FilterDate");
+          request.input('FilterDate', sql.Date, date);
+      }
+      if (client) {
+          conditions.push("(U.FullName LIKE @FilterClient OR U.Email LIKE @FilterClient)");
+          request.input('FilterClient', sql.NVarChar, `%${client}%`);
+      }
+      if (status) {
+          conditions.push("A.Status = @FilterStatus");
+          request.input('FilterStatus', sql.NVarChar, status);
+      }
+
+      if (conditions.length > 0) {
+          query += " AND " + conditions.join(" AND ");
+      }
+
+      query += " ORDER BY A.AppointmentDateTime DESC;";
+
+      request.query(query, (err, result) => {
+          if (err) {
+              console.error("Error obteniendo citas:", err);
+              return res.status(500).json({ message: "Error interno del servidor" });
+          }
+          // Mapear para anidar info del usuario
+           const appointments = result.recordset.map(app => ({
+               ...app,
+               User: { FullName: app.ClientFullName }
+           }));
+          res.json(appointments);
+      });
+  } catch (error) {
+      console.error("Error en GET /api/appointments:", error);
+      res.status(500).json({ message: "Error interno del servidor" });
+  }
+});
+
+
+// POST Crear nueva cita (Admin - requiere identificar cliente)
+app.post('/api/appointments', async (req, res) => { // Removido authenticateToken, isAdmin. Endpoint unificado.
+  const { clientIdentifier, appointmentDateTime, vehicleDescription, serviceType, status, notes } = req.body;
+
+  if (!clientIdentifier || !appointmentDateTime || !vehicleDescription || !serviceType || !status) {
+      return res.status(400).json({ message: "Identificador de cliente, Fecha/Hora, Vehículo, Servicio y Estado son requeridos." });
+  }
+
+  try {
+      // 1. Buscar el UserID del cliente
+      const userRequest = pool.request();
+      userRequest.input('ClientIdentifier', sql.NVarChar, clientIdentifier);
+      const userQuery = "SELECT ID FROM Users WHERE Email = @ClientIdentifier OR FullName = @ClientIdentifier";
+
+      userRequest.query(userQuery, (userErr, userResult) => {
+          if (userErr) {
+               console.error("Error buscando cliente:", userErr);
+               return res.status(500).json({ message: "Error buscando cliente" });
+          }
+          if (userResult.recordset.length === 0) {
+              return res.status(404).json({ message: "Cliente no encontrado con el identificador proporcionado." });
+          }
+          if (userResult.recordset.length > 1) {
+               return res.status(409).json({ message: "Múltiples clientes encontrados. Use email preferentemente." });
+          }
+
+          const userId = userResult.recordset[0].ID;
+
+           // 2. Crear la cita
+          const appRequest = pool.request();
+          appRequest.input('UserID', sql.Int, userId);
+          appRequest.input('AppointmentDateTime', sql.DateTime2, new Date(appointmentDateTime));
+          appRequest.input('VehicleDescription', sql.NVarChar, vehicleDescription);
+          appRequest.input('ServiceType', sql.NVarChar, serviceType);
+          appRequest.input('Status', sql.NVarChar, status);
+          appRequest.input('Notes', sql.NVarChar, notes || null);
+
+          const appQuery = `
+              INSERT INTO Appointments (UserID, AppointmentDateTime, VehicleDescription, ServiceType, Status, Notes)
+              OUTPUT INSERTED.*
+              VALUES (@UserID, @AppointmentDateTime, @VehicleDescription, @ServiceType, @Status, @Notes);
+          `;
+
+           appRequest.query(appQuery, (appErr, appResult) => {
+              if (appErr) {
+                  console.error("Error creando cita:", appErr);
+                  return res.status(500).json({ message: "Error interno al crear cita" });
+              }
+              // Añadir info del usuario a la respuesta para consistencia con GET
+              const createdAppointment = { ...appResult.recordset[0], User: { FullName: clientIdentifier } }; // Asume el identificador es el nombre si no se tiene aquí
+              res.status(201).json(createdAppointment);
+          });
+      });
+
+  } catch (error) {
+      console.error("Error en POST /api/appointments:", error);
+      res.status(500).json({ message: "Error interno del servidor" });
+  }
+});
+
+// PUT Actualizar cita por ID
+app.put('/api/appointments/:id', async (req, res) => { // Removido authenticateToken y isAdmin
+  const appointmentId = parseInt(req.params.id);
+  const { appointmentDateTime, vehicleDescription, serviceType, status, notes } = req.body;
+
+  if (isNaN(appointmentId)) {
+      return res.status(400).json({ message: "ID de cita inválido." });
+  }
+  if (!appointmentDateTime || !vehicleDescription || !serviceType || !status) {
+       return res.status(400).json({ message: "Fecha/Hora, Vehículo, Servicio y Estado son requeridos." });
+  }
+
+  try {
+      const request = pool.request();
+      request.input('AppointmentID', sql.Int, appointmentId);
+      request.input('AppointmentDateTime', sql.DateTime2, new Date(appointmentDateTime));
+      request.input('VehicleDescription', sql.NVarChar, vehicleDescription);
+      request.input('ServiceType', sql.NVarChar, serviceType);
+      request.input('Status', sql.NVarChar, status);
+      request.input('Notes', sql.NVarChar, notes || null);
+      request.input('UpdatedAt', sql.DateTime2, new Date());
+
+       const query = `
+          UPDATE Appointments
+          SET
+              AppointmentDateTime = @AppointmentDateTime,
+              VehicleDescription = @VehicleDescription,
+              ServiceType = @ServiceType,
+              Status = @Status,
+              Notes = @Notes,
+              UpdatedAt = @UpdatedAt
+          OUTPUT INSERTED.*
+          WHERE AppointmentID = @AppointmentID;
+      `;
+
+      request.query(query, (err, result) => {
+          if (err) {
+              console.error(`Error actualizando cita ${appointmentId}:`, err);
+              return res.status(500).json({ message: "Error interno al actualizar cita" });
+          }
+          if (result.rowsAffected[0] === 0) {
+              return res.status(404).json({ message: "Cita no encontrada." });
+          }
+           // Aquí no tenemos el nombre del usuario fácilmente, podríamos hacer otro query o devolver sin él
+          res.json(result.recordset[0]);
+      });
+
+  } catch (error) {
+      console.error(`Error en PUT /api/appointments/${appointmentId}:`, error);
+      res.status(500).json({ message: "Error interno del servidor" });
+  }
+});
+
+// DELETE Eliminar cita por ID
+app.delete('/api/appointments/:id', async (req, res) => { // Removido authenticateToken y isAdmin
+  const appointmentId = parseInt(req.params.id);
+
+   if (isNaN(appointmentId)) {
+      return res.status(400).json({ message: "ID de cita inválido." });
+  }
+
+  try {
+       const request = pool.request();
+      request.input('AppointmentID', sql.Int, appointmentId);
+      const query = "DELETE FROM Appointments WHERE AppointmentID = @AppointmentID;";
+
+       request.query(query, (err, result) => {
+          if (err) {
+              console.error(`Error eliminando cita ${appointmentId}:`, err);
+              return res.status(500).json({ message: "Error interno al eliminar cita" });
+          }
+           if (result.rowsAffected[0] === 0) {
+              return res.status(404).json({ message: "Cita no encontrada." });
+          }
+          res.status(200).json({ message: `Cita ID ${appointmentId} eliminada.` });
+      });
+
+  } catch (error) {
+      console.error(`Error en DELETE /api/appointments/${appointmentId}:`, error);
+      res.status(500).json({ message: "Error interno del servidor" });
+  }
+});
+
+// PATCH Actualizar solo el estado de una cita por ID
+app.patch('/api/appointments/:id/status', async (req, res) => { // Removido authenticateToken y isAdmin
+  const appointmentId = parseInt(req.params.id);
+  const { status } = req.body;
+
+   if (isNaN(appointmentId)) {
+      return res.status(400).json({ message: "ID de cita inválido." });
+  }
+  if (!status) {
+       return res.status(400).json({ message: "El nuevo estado es requerido." });
+  }
+
+  try {
+       const request = pool.request();
+      request.input('AppointmentID', sql.Int, appointmentId);
+      request.input('Status', sql.NVarChar, status);
+      request.input('UpdatedAt', sql.DateTime2, new Date());
+
+       const query = `
+          UPDATE Appointments
+          SET Status = @Status, UpdatedAt = @UpdatedAt
+          OUTPUT INSERTED.AppointmentID, INSERTED.Status, INSERTED.UpdatedAt
+          WHERE AppointmentID = @AppointmentID;
+      `;
+
+       request.query(query, (err, result) => {
+          if (err) {
+              console.error(`Error actualizando estado de cita ${appointmentId}:`, err);
+              return res.status(500).json({ message: "Error interno al actualizar estado" });
+          }
+          if (result.rowsAffected[0] === 0) {
+              return res.status(404).json({ message: "Cita no encontrada." });
+          }
+          res.json(result.recordset[0]);
+      });
+
+  } catch (error) {
+      console.error(`Error en PATCH /api/appointments/${appointmentId}/status:`, error);
+      res.status(500).json({ message: "Error interno del servidor" });
+  }
+});
+
+
+// --- Rutas de Usuarios (Users) --- (Simplificadas)
+
+// GET Buscar usuarios (abierto)
+app.get('/api/users', async (req, res) => { // Removido authenticateToken y isAdmin
+  const { search } = req.query;
+
+  try {
+      let query = `
+          SELECT ID, FullName, Email, PhoneNumber
+          FROM Users
+      `;
+      const request = pool.request();
+      const conditions = [];
+
+      if (search) {
+           conditions.push("(FullName LIKE @Search OR Email LIKE @Search)");
+           request.input('Search', sql.NVarChar, `%${search}%`);
+      }
+
+       if (conditions.length > 0) {
+          query += " WHERE " + conditions.join(" AND ");
+      }
+
+      query += " ORDER BY FullName;";
+
+      request.query(query, (err, result) => {
+          if (err) {
+               console.error("Error buscando usuarios:", err);
+              return res.status(500).json({ message: "Error interno del servidor" });
+          }
+          res.json(result.recordset);
+      });
+
+  } catch (error) {
+       console.error("Error en GET /api/users:", error);
+      res.status(500).json({ message: "Error interno del servidor" });
+  }
+});
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////

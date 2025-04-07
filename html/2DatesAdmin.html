@@ -3,532 +3,553 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Administración de Citas - AutoCare Rodriguez</title>
+    <title>Panel Admin - AutoCare Rodriguez</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .saving-indicator::after { content: '...'; display: inline-block; animation: dots 1s steps(5, end) infinite; }
+        @keyframes dots { 0%, 20% { content: '.'; } 40% { content: '..'; } 60%, 100% { content: '...'; } }
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
+    </style>
 </head>
-<body class="bg-gray-100">
-    <nav class="bg-gray-800 text-white px-4 py-3">
+<body class="bg-gray-50">
+
+    <nav class="bg-gray-800 text-white px-6 py-4">
         <div class="flex items-center justify-between">
-            <h1 class="text-xl font-bold">AutoCare Rodriguez</h1>
-            <div class="flex space-x-2">
-                <a href="/admin/clientes" class="px-3 py-1 rounded hover:bg-gray-700">Clientes</a>                  
-                <a href="/admin/citas" class="px-3 py-1 rounded bg-gray-700">Citas</a>
-                <a href="/admin/servicios" class="px-3 py-1 rounded hover:bg-gray-700">Servicios</a>
-                <a href="/admin/inventario" class="px-3 py-1 rounded hover:bg-gray-700">Inventario</a>
-            </div>
+            <h1 class="text-2xl font-bold">Panel Admin - AutoCare Rodriguez</h1>
+            <div class="flex items-center space-x-4">
+                <a href="#"><button class="px-4 py-2 rounded hover:bg-gray-700">Clientes</button></a>
+                <a href="admin.html"><button class="px-4 py-2 rounded bg-gray-700">Citas</button></a>
+                <a href="#"><button class="px-4 py-2 rounded hover:bg-gray-700">Inventario</button></a>
+                <a href="#"><button class="px-4 py-2 rounded hover:bg-gray-700">Facturación</button></a>
+                <a href="#"><button class="px-4 py-2 rounded hover:bg-gray-700">Usuarios Admin</button></a>
+                </div>
         </div>
     </nav>
 
-    <div class="container mx-auto px-4 py-6">
+    <div id="adminView" class="container mx-auto px-4 py-8">
         <div class="flex justify-between items-center mb-6">
-            <h2 class="text-2xl font-semibold">Gestión de Citas</h2>
-            <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700" 
-                    onclick="nuevaCita()">
-                Nueva Cita
+            <h2 class="text-3xl font-semibold text-gray-800">Gestión de Citas</h2>
+            <button id="open-admin-schedule-modal-btn" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                Agregar Nueva Cita
             </button>
         </div>
-        
-        <!-- Filtros Simplificados -->
-        <div class="bg-white rounded shadow p-4 mb-6">
-            <div class="flex flex-wrap gap-2">
-                <input type="date" id="filtroFecha" class="px-3 py-2 border rounded" placeholder="Fecha">
-                <input type="text" id="filtroCliente" class="px-3 py-2 border rounded" placeholder="Buscar Cliente">
-                <select id="filtroEstado" class="px-3 py-2 border rounded">
-                    <option value="">Todos los Estados</option>
-                    <option value="pendiente">Pendiente</option>
-                    <option value="en_progreso">En Progreso</option>
-                    <option value="completado">Completado</option>
-                    <option value="cancelado">Cancelado</option>
-                </select>
-                <button onclick="filtrarCitas()" class="px-4 py-2 bg-blue-600 text-white rounded">Filtrar</button>
-            </div>
-        </div>
-        
-        <!-- Tabla de Citas -->
-        <div class="bg-white rounded shadow overflow-x-auto">
-            <table class="w-full">
-                <thead class="bg-gray-50">
-                    <tr>
-                        <th class="px-4 py-2 text-left">Fecha y Hora</th>
-                        <th class="px-4 py-2 text-left">Cliente</th>
-                        <th class="px-4 py-2 text-left">Vehículo</th>
-                        <th class="px-4 py-2 text-left">Servicio</th>
-                        <th class="px-4 py-2 text-left">Estado</th>
-                        <th class="px-4 py-2 text-left">Acciones</th>
-                    </tr>
-                </thead>
-                <tbody id="tablaCitas" class="divide-y divide-gray-200">
-                    <!-- Las filas de citas se cargarán dinámicamente con JavaScript -->
-                </tbody>
-            </table>
-            
-            <!-- Paginación Simplificada -->
-            <div class="p-4 flex justify-between items-center">
-                <span id="infoPaginacion" class="text-sm text-gray-500">
-                    Cargando información...
-                </span>
-                <div id="paginacion" class="flex space-x-1">
-                    <!-- Los botones de paginación se generarán dinámicamente -->
+
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+             <h3 class="text-xl font-semibold mb-4">Filtrar Citas</h3>
+            <form id="filter-form" class="flex flex-col md:flex-row gap-4 items-end">
+                <div class="flex-1">
+                     <label for="filter-date" class="block text-sm font-medium text-gray-700 mb-1">Fecha</label>
+                    <input type="date" id="filter-date" name="filter_date" class="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500">
                 </div>
+                 <div class="flex-1">
+                     <label for="filter-client" class="block text-sm font-medium text-gray-700 mb-1">Cliente (Nombre o Email)</label>
+                    <input type="text" id="filter-client" name="filter_client" placeholder="Buscar..." class="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                 </div>
+                 <div class="flex-1">
+                     <label for="filter-status" class="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+                    <select id="filter-status" name="filter_status" class="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">Todos</option>
+                        <option value="pending">Pendiente</option>
+                        <option value="in_progress">En Progreso</option>
+                        <option value="completed">Completado</option>
+                        <option value="cancelled">Cancelado</option>
+                    </select>
+                </div>
+                <button type="button" id="filter-btn" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 h-10">Filtrar</button>
+                <button type="button" id="clear-filter-btn" class="px-6 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 h-10">Limpiar</button>
+            </form>
+        </div>
+
+        <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-xl font-semibold mb-4">Listado de Citas</h3>
+             <div id="api-error-message" class="mb-4 p-3 text-red-700 bg-red-100 border border-red-400 rounded hidden"></div>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha y Hora</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vehículo</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Servicio</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="appointments-table-body" class="bg-white divide-y divide-gray-200">
+                        <tr id="loading-row">
+                            <td colspan="6" class="text-center py-4 text-gray-500">Cargando citas...</td>
+                        </tr>
+                        </tbody>
+                </table>
             </div>
+             <div id="no-results" class="text-center py-4 text-gray-500 hidden">No se encontraron citas con los filtros aplicados.</div>
         </div>
     </div>
 
-    <!-- Modal para Nueva/Editar Cita -->
-    <div id="modalCita" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div class="bg-white rounded-lg p-6 max-w-md w-full">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-xl font-semibold" id="modalTitle">Programar Nueva Cita</h3>
-                <button onclick="document.getElementById('modalCita').classList.add('hidden')" class="text-gray-500 hover:text-gray-700">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                    </svg>
+    <div id="adminScheduleModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto p-4">
+         <div class="bg-white rounded-lg p-8 max-w-2xl w-full m-auto">
+             <div class="flex justify-between items-center mb-6">
+                <h3 id="admin-modal-title" class="text-2xl font-semibold">Agregar Nueva Cita</h3>
+                <button id="close-admin-schedule-modal-btn" class="text-gray-500 hover:text-gray-700">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
             </div>
-            <form id="formCita" class="space-y-4">
-                <input type="hidden" id="id_cita" value="">
-                
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Cliente</label>
-                    <select id="id_cliente" required class="w-full px-3 py-2 border rounded">
-                        <option value="">Seleccione Cliente</option>
-                        <!-- Se cargará dinámicamente -->
-                    </select>
+            <form id="admin-schedule-form" class="space-y-6">
+                <input type="hidden" id="a-appointment-id" name="appointmentId">
+                <input type="hidden" id="a-user-id" name="userId"> <div>
+                    <label for="a-cliente" class="block text-sm font-medium text-gray-700 mb-1">Cliente (Nombre o Email)</label>
+                    <input type="text" id="a-cliente" name="clientIdentifier" required class="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500" placeholder="Nombre completo o Email del cliente...">
                 </div>
-                
-                <div class="grid grid-cols-2 gap-3">
+                <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Fecha</label>
-                        <input type="date" id="fecha" required class="w-full px-3 py-2 border rounded">
+                        <label for="a-fecha" class="block text-sm font-medium text-gray-700 mb-1">Fecha</label>
+                        <input type="date" id="a-fecha" name="appointmentDate" required class="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500">
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Hora</label>
-                        <input type="time" id="hora" required class="w-full px-3 py-2 border rounded">
+                        <label for="a-hora" class="block text-sm font-medium text-gray-700 mb-1">Hora</label>
+                        <input type="time" id="a-hora" name="appointmentTime" required class="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500">
                     </div>
                 </div>
-                
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Vehículo</label>
-                    <select id="id_vehiculo" required class="w-full px-3 py-2 border rounded">
-                        <option value="">Seleccione Vehículo</option>
-                        <!-- Se cargará dinámicamente -->
-                    </select>
+                    <label for="a-vehiculo" class="block text-sm font-medium text-gray-700 mb-1">Descripción del Vehículo</label>
+                    <input type="text" id="a-vehiculo" name="vehicleDescription" required class="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500" placeholder="Ej: Toyota Camry 2020 Azul">
                 </div>
-                
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Servicio</label>
-                    <select id="id_servicio" required class="w-full px-3 py-2 border rounded">
+                    <label for="a-servicio" class="block text-sm font-medium text-gray-700 mb-1">Tipo de Servicio</label>
+                    <select id="a-servicio" name="serviceType" required class="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500">
                         <option value="">Seleccione Servicio</option>
-                        <!-- Se cargará dinámicamente -->
+                        <option value="oil_change">Cambio de Aceite</option>
+                        <option value="tire_rotation">Rotación de Llantas</option>
+                        <option value="brake_service">Servicio de Frenos</option>
+                        <option value="diagnostico">Diagnóstico General</option>
+                        <option value="otro">Otro (detallar en notas)</option>
                     </select>
                 </div>
-                
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Técnico</label>
-                    <select id="id_tecnico" class="w-full px-3 py-2 border rounded">
-                        <option value="">Seleccione Técnico</option>
-                        <!-- Se cargará dinámicamente -->
+                 <div>
+                    <label for="a-status" class="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+                    <select id="a-status" name="status" required class="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                        <option value="pending">Pendiente</option>
+                        <option value="in_progress">En Progreso</option>
+                        <option value="completed">Completado</option>
+                        <option value="cancelled">Cancelado</option>
                     </select>
                 </div>
-                
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Notas</label>
-                    <textarea id="notas" class="w-full px-3 py-2 border rounded" rows="2"></textarea>
+                    <label for="a-notas" class="block text-sm font-medium text-gray-700 mb-1">Notas Adicionales (Admin)</label>
+                    <textarea id="a-notas" name="notes" class="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500" rows="3"></textarea>
                 </div>
-                
-                <div class="flex justify-end space-x-3 pt-2">
-                    <button type="button" onclick="document.getElementById('modalCita').classList.add('hidden')" 
-                            class="px-4 py-2 border rounded hover:bg-gray-100">
-                        Cancelar
-                    </button>
-                    <button type="button" onclick="guardarCita()" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
-                        Guardar
+                <div id="admin-schedule-form-feedback" class="text-red-600 text-sm mt-2"></div>
+                <div class="flex justify-end space-x-4">
+                    <button type="button" id="cancel-admin-schedule-btn" class="px-6 py-2 border rounded-lg hover:bg-gray-100">Cancelar</button>
+                    <button type="button" id="submit-admin-schedule-btn" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                        Guardar Cita
                     </button>
                 </div>
             </form>
         </div>
     </div>
 
-    <script>
-        // Variables globales
-        let paginaActual = 1;
-        const citasPorPagina = 10;
-        let totalCitas = 0;
-        let totalPaginas = 0;
-        
-        // Cargar datos al iniciar la página
+    <footer class="bg-gray-800 text-white py-6 px-6 mt-8">
+        <div class="container mx-auto text-center">
+             <p>&copy; <span id="current-year-admin"></span> AutoCare Rodriguez. Todos los derechos reservados.</p>
+        </div>
+    </footer>
+
+     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            cargarCitas();
-            cargarClientes();
-            cargarServicios();
-            cargarTecnicos();
-        });
-        
-        // Función para cargar la lista de citas
-        async function cargarCitas(pagina = 1, filtros = {}) {
-            try {
-                // Construir query string para filtros
+            // --- Configuración ---
+            const API_BASE_URL = 'http://localhost:3000'; // Ajusta si tu API corre en otro puerto/host
+
+            // --- Elements ---
+            const adminScheduleModal = document.getElementById('adminScheduleModal');
+            const openAdminModalBtn = document.getElementById('open-admin-schedule-modal-btn');
+            const closeAdminModalBtn = document.getElementById('close-admin-schedule-modal-btn');
+            const cancelAdminModalBtn = document.getElementById('cancel-admin-schedule-btn');
+            const adminScheduleForm = document.getElementById('admin-schedule-form');
+            const submitAdminScheduleBtn = document.getElementById('submit-admin-schedule-btn');
+            const adminFeedbackDiv = document.getElementById('admin-schedule-form-feedback');
+            const appointmentsTableBody = document.getElementById('appointments-table-body');
+            const loadingRow = document.getElementById('loading-row');
+            const noResultsDiv = document.getElementById('no-results');
+            const filterForm = document.getElementById('filter-form');
+            const filterBtn = document.getElementById('filter-btn');
+            const clearFilterBtn = document.getElementById('clear-filter-btn');
+            const adminModalTitle = document.getElementById('admin-modal-title');
+            const appointmentIdInput = document.getElementById('a-appointment-id');
+            const userIdInput = document.getElementById('a-user-id'); // Input oculto para UserID en edición
+            const apiErrorMessageDiv = document.getElementById('api-error-message');
+
+
+            // --- Funciones Auxiliares ---
+            function showApiError(message) {
+                apiErrorMessageDiv.textContent = `Error API: ${message}`;
+                apiErrorMessageDiv.classList.remove('hidden');
+            }
+            function hideApiError() {
+                apiErrorMessageDiv.classList.add('hidden');
+                apiErrorMessageDiv.textContent = '';
+            }
+            // Función genérica para fetch (simplifica añadir headers, manejar errores)
+            async function apiFetch(endpoint, options = {}) {
+                 // No se añade el header Authorization
+                options.headers = {
+                    'Content-Type': 'application/json',
+                    ...options.headers, // Permite sobreescribir Content-Type si es necesario
+                };
+
+                try {
+                    const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
+                    hideApiError(); // Ocultar error previo si la nueva llamada funciona inicialmente
+
+                    if (!response.ok) {
+                        let errorData;
+                        try {
+                            errorData = await response.json(); // Intenta obtener mensaje de error de la API
+                        } catch (e) {
+                            errorData = { message: response.statusText }; // Usa texto de estado si no hay JSON
+                        }
+                        console.error(`API Error ${response.status}:`, errorData);
+                        showApiError(errorData.message || `Error ${response.status}`);
+                        throw new Error(errorData.message || `Error ${response.status}`);
+                    }
+
+                    // Si la respuesta es 204 No Content (ej: DELETE exitoso sin cuerpo)
+                    if (response.status === 204) {
+                        return null; // O un objeto indicando éxito, ej: { success: true }
+                    }
+
+                    return await response.json(); // Parsea respuesta JSON normal
+                } catch (error) {
+                    // Errores de red u otros errores que no son respuestas HTTP
+                    if (!apiErrorMessageDiv.textContent) { // No sobrescribir si ya hay un error HTTP
+                       console.error('Fetch Error:', error);
+                       showApiError(error.message || 'Error de conexión o de red.');
+                    }
+                    throw error; // Propagar el error para manejo adicional si es necesario
+                }
+            }
+
+            // --- Modal Handling ---
+            const showAdminModal = (isEditMode = false, appointmentData = null) => {
+                adminScheduleForm.reset();
+                appointmentIdInput.value = '';
+                userIdInput.value = ''; // Limpiar UserID oculto
+                adminFeedbackDiv.textContent = '';
+                hideApiError(); // Ocultar errores de API al abrir modal
+
+                 // Deshabilitar campo cliente en modo edición
+                 document.getElementById('a-cliente').disabled = isEditMode;
+
+                if (isEditMode && appointmentData) {
+                    adminModalTitle.textContent = 'Editar Cita';
+                    appointmentIdInput.value = appointmentData.AppointmentID;
+                    userIdInput.value = appointmentData.UserID; // Guardar UserID
+
+                    // Poblar formulario
+                    document.getElementById('a-cliente').value = appointmentData.User?.FullName || `Usuario ID: ${appointmentData.UserID}`; // Mostrar nombre o ID
+                    const dateTime = new Date(appointmentData.AppointmentDateTime);
+                    // Manejo de zona horaria local para inputs date/time
+                    const localDate = new Date(dateTime.getTime() - dateTime.getTimezoneOffset() * 60000);
+                    document.getElementById('a-fecha').value = localDate.toISOString().split('T')[0];
+                    document.getElementById('a-hora').value = localDate.toISOString().split('T')[1].substring(0, 5);
+                    document.getElementById('a-vehiculo').value = appointmentData.VehicleDescription;
+                    document.getElementById('a-servicio').value = appointmentData.ServiceType;
+                    document.getElementById('a-status').value = appointmentData.Status;
+                    document.getElementById('a-notas').value = appointmentData.Notes || '';
+                } else {
+                    adminModalTitle.textContent = 'Agregar Nueva Cita';
+                     document.getElementById('a-cliente').disabled = false; // Habilitar campo cliente
+                }
+                adminScheduleModal.classList.remove('hidden');
+            };
+            const hideAdminModal = () => {
+                 adminScheduleModal.classList.add('hidden');
+                 adminFeedbackDiv.textContent = ''; // Limpiar feedback del form al cerrar
+            }
+
+            openAdminModalBtn.addEventListener('click', () => showAdminModal(false));
+            closeAdminModalBtn.addEventListener('click', hideAdminModal);
+            cancelAdminModalBtn.addEventListener('click', hideAdminModal);
+
+            // --- Footer Year ---
+            document.getElementById('current-year-admin').textContent = new Date().getFullYear();
+
+            // --- API Interaction ---
+            function getFilterParams() {
                 const params = new URLSearchParams();
-                params.append('pagina', pagina);
-                params.append('limite', citasPorPagina);
-                
-                if (filtros.fecha) params.append('fecha', filtros.fecha);
-                if (filtros.cliente) params.append('cliente', filtros.cliente);
-                if (filtros.estado) params.append('estado', filtros.estado);
-                
-                const response = await fetch(`/api/citas?${params.toString()}`);
-                const data = await response.json();
-                
-                if (data.success) {
-                    mostrarCitas(data.citas);
-                    actualizarPaginacion(data.total, data.pagina);
-                } else {
-                    alert('Error al cargar las citas: ' + data.mensaje);
-                }
-            } catch (error) {
-                console.error('Error al cargar citas:', error);
-                alert('Error de conexión al servidor');
+                const date = document.getElementById('filter-date').value;
+                const client = document.getElementById('filter-client').value.trim();
+                const status = document.getElementById('filter-status').value;
+                if (date) params.append('date', date);
+                if (client) params.append('client', client);
+                if (status) params.append('status', status);
+                return params.toString();
             }
-        }
-        
-        // Mostrar citas en la tabla
-        function mostrarCitas(citas) {
-            const tabla = document.getElementById('tablaCitas');
-            tabla.innerHTML = '';
-            
-            if (citas.length === 0) {
-                const row = document.createElement('tr');
-                row.innerHTML = `<td colspan="6" class="px-4 py-4 text-center">No se encontraron citas</td>`;
-                tabla.appendChild(row);
-                return;
-            }
-            
-            citas.forEach(cita => {
-                const row = document.createElement('tr');
-                row.className = 'hover:bg-gray-50';
-                
-                row.innerHTML = `
-                    <td class="px-4 py-2">${cita.fecha} ${cita.hora}</td>
-                    <td class="px-4 py-2">${cita.nombre_cliente}</td>
-                    <td class="px-4 py-2">${cita.vehiculo}</td>
-                    <td class="px-4 py-2">${cita.servicio}</td>
-                    <td class="px-4 py-2">
-                        <select onchange="actualizarEstado('${cita.id}', this.value)" class="px-2 py-1 border rounded text-sm">
-                            <option value="pendiente" ${cita.estado === 'pendiente' ? 'selected' : ''}>Pendiente</option>
-                            <option value="en_progreso" ${cita.estado === 'en_progreso' ? 'selected' : ''}>En Progreso</option>
-                            <option value="completado" ${cita.estado === 'completado' ? 'selected' : ''}>Completado</option>
-                            <option value="cancelado" ${cita.estado === 'cancelado' ? 'selected' : ''}>Cancelado</option>
-                        </select>
-                    </td>
-                    <td class="px-4 py-2">
-                        <button onclick="editarCita('${cita.id}')" class="text-blue-600 hover:text-blue-800 mr-2">Editar</button>
-                        <button onclick="eliminarCita('${cita.id}')" class="text-red-600 hover:text-red-800">Eliminar</button>
-                    </td>
-                `;
-                
-                tabla.appendChild(row);
-            });
-        }
-        
-        // Actualizar paginación
-        function actualizarPaginacion(total, pagina) {
-            totalCitas = total;
-            paginaActual = pagina;
-            totalPaginas = Math.ceil(total / citasPorPagina);
-            
-            // Actualizar texto informativo
-            const inicio = (pagina - 1) * citasPorPagina + 1;
-            const fin = Math.min(inicio + citasPorPagina - 1, total);
-            document.getElementById('infoPaginacion').textContent = `Mostrando ${inicio} - ${fin} de ${total} citas`;
-            
-            // Generar botones de paginación
-            const paginacion = document.getElementById('paginacion');
-            paginacion.innerHTML = '';
-            
-            // Botón Anterior
-            if (pagina > 1) {
-                const btnAnterior = document.createElement('button');
-                btnAnterior.className = 'px-3 py-1 border rounded hover:bg-gray-100';
-                btnAnterior.textContent = 'Anterior';
-                btnAnterior.onclick = () => cargarCitas(pagina - 1, obtenerFiltros());
-                paginacion.appendChild(btnAnterior);
-            }
-            
-            // Números de página
-            for (let i = 1; i <= totalPaginas; i++) {
-                if (totalPaginas <= 5 || i === 1 || i === totalPaginas || (i >= pagina - 1 && i <= pagina + 1)) {
-                    const btnPagina = document.createElement('button');
-                    btnPagina.className = `px-3 py-1 border rounded ${pagina === i ? 'bg-blue-600 text-white' : 'hover:bg-gray-100'}`;
-                    btnPagina.textContent = i;
-                    btnPagina.onclick = () => cargarCitas(i, obtenerFiltros());
-                    paginacion.appendChild(btnPagina);
-                } else if (i === pagina - 2 || i === pagina + 2) {
-                    const puntos = document.createElement('span');
-                    puntos.className = 'px-3 py-1';
-                    puntos.textContent = '...';
-                    paginacion.appendChild(puntos);
-                }
-            }
-            
-            // Botón Siguiente
-            if (pagina < totalPaginas) {
-                const btnSiguiente = document.createElement('button');
-                btnSiguiente.className = 'px-3 py-1 border rounded hover:bg-gray-100';
-                btnSiguiente.textContent = 'Siguiente';
-                btnSiguiente.onclick = () => cargarCitas(pagina + 1, obtenerFiltros());
-                paginacion.appendChild(btnSiguiente);
-            }
-        }
-        
-        // Cargar catálogos para formularios
-        async function cargarClientes() {
-            try {
-                const response = await fetch('/api/clientes');
-                const data = await response.json();
-                
-                if (data.success) {
-                    const select = document.getElementById('id_cliente');
-                    select.innerHTML = '<option value="">Seleccione Cliente</option>';
-                    
-                    data.clientes.forEach(cliente => {
-                        const option = document.createElement('option');
-                        option.value = cliente.id;
-                        option.textContent = cliente.nombre;
-                        select.appendChild(option);
-                    });
-                }
-            } catch (error) {
-                console.error('Error al cargar clientes:', error);
-            }
-        }
-        
-        async function cargarServicios() {
-            try {
-                const response = await fetch('/api/servicios');
-                const data = await response.json();
-                
-                if (data.success) {
-                    const select = document.getElementById('id_servicio');
-                    select.innerHTML = '<option value="">Seleccione Servicio</option>';
-                    
-                    data.servicios.forEach(servicio => {
-                        const option = document.createElement('option');
-                        option.value = servicio.id;
-                        option.textContent = servicio.nombre;
-                        select.appendChild(option);
-                    });
-                }
-            } catch (error) {
-                console.error('Error al cargar servicios:', error);
-            }
-        }
-        
-        async function cargarTecnicos() {
-            try {
-                const response = await fetch('/api/tecnicos');
-                const data = await response.json();
-                
-                if (data.success) {
-                    const select = document.getElementById('id_tecnico');
-                    select.innerHTML = '<option value="">Seleccione Técnico</option>';
-                    
-                    data.tecnicos.forEach(tecnico => {
-                        const option = document.createElement('option');
-                        option.value = tecnico.id;
-                        option.textContent = tecnico.nombre;
-                        select.appendChild(option);
-                    });
-                }
-            } catch (error) {
-                console.error('Error al cargar técnicos:', error);
-            }
-        }
-        
-        // Cargar vehículos cuando se selecciona un cliente
-        document.getElementById('id_cliente').addEventListener('change', async function() {
-            const clienteId = this.value;
-            const vehiculoSelect = document.getElementById('id_vehiculo');
-            
-            // Limpiar opciones actuales
-            vehiculoSelect.innerHTML = '<option value="">Seleccione Vehículo</option>';
-            
-            if (clienteId) {
+
+            async function loadAllAppointments() {
+                loadingRow.style.display = '';
+                noResultsDiv.classList.add('hidden');
+                appointmentsTableBody.innerHTML = ''; // Limpiar tabla antes de añadir fila de carga
+                appointmentsTableBody.appendChild(loadingRow);
+                hideApiError(); // Ocultar errores previos
+
+                const filters = getFilterParams();
+                const endpoint = `/api/appointments?${filters}`; // Usa la ruta base ahora
+
+                console.log(`Cargando citas desde: ${endpoint}`);
+
                 try {
-                    const response = await fetch(`/api/vehiculos?cliente=${clienteId}`);
-                    const data = await response.json();
-                    
-                    if (data.success) {
-                        data.vehiculos.forEach(vehiculo => {
-                            const option = document.createElement('option');
-                            option.value = vehiculo.id;
-                            option.textContent = `${vehiculo.marca} ${vehiculo.modelo} (${vehiculo.ano})`;
-                            vehiculoSelect.appendChild(option);
-                        });
-                    }
-                } catch (error) {
-                    console.error('Error al cargar vehículos:', error);
-                }
-            }
-        });
-        
-        // Función para filtrar citas
-        function filtrarCitas() {
-            const filtros = obtenerFiltros();
-            cargarCitas(1, filtros);
-        }
-        
-        function obtenerFiltros() {
-            return {
-                fecha: document.getElementById('filtroFecha').value,
-                cliente: document.getElementById('filtroCliente').value,
-                estado: document.getElementById('filtroEstado').value
-            };
-        }
-        
-        // Función para actualizar estado de una cita
-        async function actualizarEstado(id, estado) {
-            try {
-                const response = await fetch(`/api/citas/${id}/estado`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ estado })
-                });
-                
-                const data = await response.json();
-                
-                if (!data.success) {
-                    alert('Error al actualizar estado: ' + data.mensaje);
-                    // Recargar citas para mostrar el estado original
-                    cargarCitas(paginaActual, obtenerFiltros());
-                }
-            } catch (error) {
-                console.error('Error al actualizar estado:', error);
-                alert('Error de conexión al servidor');
-                cargarCitas(paginaActual, obtenerFiltros());
-            }
-        }
-        
-        // Función para editar una cita
-        async function editarCita(id) {
-            try {
-                const response = await fetch(`/api/citas/${id}`);
-                const data = await response.json();
-                
-                if (data.success) {
-                    const cita = data.cita;
-                    
-                    document.getElementById('modalTitle').textContent = 'Editar Cita';
-                    document.getElementById('id_cita').value = cita.id;
-                    document.getElementById('id_cliente').value = cita.id_cliente;
-                    document.getElementById('fecha').value = cita.fecha;
-                    document.getElementById('hora').value = cita.hora;
-                    
-                    // Disparar el evento change para cargar los vehículos del cliente
-                    const event = new Event('change');
-                    document.getElementById('id_cliente').dispatchEvent(event);
-                    
-                    // Establecer valores después de cargar vehículos
-                    setTimeout(() => {
-                        document.getElementById('id_vehiculo').value = cita.id_vehiculo;
-                        document.getElementById('id_servicio').value = cita.id_servicio;
-                        document.getElementById('id_tecnico').value = cita.id_tecnico || '';
-                        document.getElementById('notas').value = cita.notas || '';
-                    }, 500);
-                    
-                    document.getElementById('modalCita').classList.remove('hidden');
-                } else {
-                    alert('Error al cargar información de la cita: ' + data.mensaje);
-                }
-            } catch (error) {
-                console.error('Error al cargar cita:', error);
-                alert('Error de conexión al servidor');
-            }
-        }
-        
-        // Función para eliminar una cita
-        async function eliminarCita(id) {
-            if (confirm('¿Estás seguro de eliminar esta cita?')) {
-                try {
-                    const response = await fetch(`/api/citas/${id}`, {
-                        method: 'DELETE'
-                    });
-                    
-                    const data = await response.json();
-                    
-                    if (data.success) {
-                        alert('Cita eliminada correctamente');
-                        cargarCitas(paginaActual, obtenerFiltros());
+                    const appointments = await apiFetch(endpoint); // Usa la función apiFetch
+                    loadingRow.style.display = 'none';
+
+                    if (appointments && appointments.length > 0) {
+                        appointmentsTableBody.innerHTML = ''; // Limpiar completamente antes de añadir filas reales
+                        appointments.forEach(renderAppointmentRow);
                     } else {
-                        alert('Error al eliminar cita: ' + data.mensaje);
+                        appointmentsTableBody.innerHTML = '';
+                        noResultsDiv.classList.remove('hidden');
                     }
                 } catch (error) {
-                    console.error('Error al eliminar cita:', error);
-                    alert('Error de conexión al servidor');
+                    // El error ya se muestra por apiFetch
+                    loadingRow.style.display = 'none';
+                    appointmentsTableBody.innerHTML = ''; // Limpiar por si acaso
+                    // No necesitamos añadir una fila de error aquí, ya se muestra arriba
                 }
             }
-        }
-        
-        // Función para crear una nueva cita
-        function nuevaCita() {
-            document.getElementById('modalTitle').textContent = 'Programar Nueva Cita';
-            document.getElementById('formCita').reset();
-            document.getElementById('id_cita').value = '';
-            document.getElementById('modalCita').classList.remove('hidden');
-        }
-        
-        // Función para guardar una cita (crear o actualizar)
-        async function guardarCita() {
-            const id = document.getElementById('id_cita').value;
-            const esNueva = id === '';
-            
-            const citaData = {
-                id_cliente: document.getElementById('id_cliente').value,
-                id_vehiculo: document.getElementById('id_vehiculo').value,
-                id_servicio: document.getElementById('id_servicio').value,
-                id_tecnico: document.getElementById('id_tecnico').value || null,
-                fecha: document.getElementById('fecha').value,
-                hora: document.getElementById('hora').value,
-                notas: document.getElementById('notas').value
-            };
-            
-            // Validar campos requeridos
-            if (!citaData.id_cliente || !citaData.id_vehiculo || !citaData.id_servicio || !citaData.fecha || !citaData.hora) {
-                alert('Por favor complete todos los campos requeridos');
-                return;
-            }
-            
-            try {
-                const url = esNueva ? '/api/citas' : `/api/citas/${id}`;
-                const method = esNueva ? 'POST' : 'PUT';
-                
-                const response = await fetch(url, {
-                    method,
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(citaData)
+
+            function renderAppointmentRow(appointment) {
+                // Formatear fecha/hora localmente
+                const localDateTime = new Date(appointment.AppointmentDateTime).toLocaleString('es-MX', {
+                    year: 'numeric', month: '2-digit', day: '2-digit',
+                    hour: '2-digit', minute: '2-digit', hour12: true
                 });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    alert(esNueva ? 'Cita creada correctamente' : 'Cita actualizada correctamente');
-                    document.getElementById('modalCita').classList.add('hidden');
-                    cargarCitas(paginaActual, obtenerFiltros());
-                } else {
-                    alert(`Error al ${esNueva ? 'crear' : 'actualizar'} cita: ${data.mensaje}`);
-                }
-            } catch (error) {
-                console.error(`Error al ${esNueva ? 'crear' : 'actualizar'} cita:`, error);
-                alert('Error de conexión al servidor');
+
+                 const rowHTML = `
+                    <tr class="hover:bg-gray-50 appointment-row" data-appointment-id="${appointment.AppointmentID}" data-user-id="${appointment.UserID}" data-client-name="${appointment.User?.FullName || ''}" data-vehicle="${appointment.VehicleDescription}" data-service="${appointment.ServiceType}" data-datetime="${appointment.AppointmentDateTime}" data-notes="${appointment.Notes || ''}" data-status="${appointment.Status}">
+                        <td class="px-6 py-4 whitespace-nowrap appointment-datetime">${localDateTime}</td>
+                        <td class="px-6 py-4 whitespace-nowrap appointment-client">${appointment.User?.FullName || `Usuario ID: ${appointment.UserID}`}</td>
+                        <td class="px-6 py-4 whitespace-nowrap appointment-vehicle">${appointment.VehicleDescription}</td>
+                        <td class="px-6 py-4 whitespace-nowrap appointment-service">${appointment.ServiceType}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <select class="status-select px-2 py-1 border rounded text-sm focus:ring-indigo-500 focus:border-indigo-500" data-original-status="${appointment.Status}">
+                                <option value="pending" ${appointment.Status === 'pending' ? 'selected' : ''}>Pendiente</option>
+                                <option value="in_progress" ${appointment.Status === 'in_progress' ? 'selected' : ''}>En Progreso</option>
+                                <option value="completed" ${appointment.Status === 'completed' ? 'selected' : ''}>Completado</option>
+                                <option value="cancelled" ${appointment.Status === 'cancelled' ? 'selected' : ''}>Cancelado</option>
+                            </select>
+                            <button class="update-status-btn ml-2 text-xs text-green-600 hover:text-green-800" style="display: none;">Guardar</button>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <button class="text-indigo-600 hover:text-indigo-900 mr-3 edit-btn">Editar</button>
+                            <button class="text-red-600 hover:text-red-900 delete-btn">Eliminar</button>
+                        </td>
+                    </tr>`;
+                appointmentsTableBody.insertAdjacentHTML('beforeend', rowHTML);
             }
-        }
+
+            // Listener filtros
+            filterBtn.addEventListener('click', loadAllAppointments);
+            clearFilterBtn.addEventListener('click', () => {
+                filterForm.reset();
+                loadAllAppointments();
+            });
+
+             // Listener formulario agregar/editar cita
+             submitAdminScheduleBtn.addEventListener('click', async () => {
+                adminFeedbackDiv.textContent = '';
+                hideApiError();
+                const formData = new FormData(adminScheduleForm);
+                const appointmentId = formData.get('appointmentId');
+                const isEditMode = !!appointmentId;
+
+                // Asegurarse que la fecha y hora se combinen correctamente
+                 const dateValue = formData.get('appointmentDate');
+                 const timeValue = formData.get('appointmentTime');
+                 let combinedDateTime = null;
+                 if(dateValue && timeValue){
+                     // Crear fecha en UTC para evitar problemas de zona horaria al enviar a la API
+                     // La API debería interpretarla correctamente
+                      const dateObj = new Date(dateValue + 'T' + timeValue + ':00');
+                      // Validar si la fecha es válida antes de convertir
+                      if (!isNaN(dateObj.getTime())) {
+                         combinedDateTime = dateObj.toISOString(); // Enviar en formato ISO 8601 (UTC por defecto)
+                      }
+                 }
+
+
+                const data = {
+                    // En modo edición, no enviamos clientIdentifier, el ID de usuario ya está asociado
+                    // Enviamos clientIdentifier solo si NO estamos en modo edición
+                    clientIdentifier: isEditMode ? undefined : formData.get('clientIdentifier'),
+                    appointmentDateTime: combinedDateTime,
+                    vehicleDescription: formData.get('vehicleDescription'),
+                    serviceType: formData.get('serviceType'),
+                    status: formData.get('status'),
+                    notes: formData.get('notes') || null
+                };
+
+                 // Remover clientIdentifier si es undefined (para PUT)
+                 if(data.clientIdentifier === undefined) delete data.clientIdentifier;
+
+
+                 // Validación básica frontal
+                 if ((!isEditMode && !data.clientIdentifier) || !data.appointmentDateTime || !data.vehicleDescription || !data.serviceType || !data.status) {
+                     adminFeedbackDiv.textContent = 'Por favor, complete todos los campos requeridos (Cliente*, Fecha, Hora, Vehículo, Servicio, Estado). *Cliente requerido solo al crear.';
+                     return;
+                 }
+                 if (!combinedDateTime) {
+                     adminFeedbackDiv.textContent = 'Fecha u hora inválida.';
+                     return;
+                 }
+
+
+                const endpoint = isEditMode ? `/api/appointments/${appointmentId}` : '/api/appointments';
+                const method = isEditMode ? 'PUT' : 'POST';
+
+                console.log(`Enviando datos a ${method} ${endpoint}:`, JSON.stringify(data));
+                submitAdminScheduleBtn.disabled = true;
+                submitAdminScheduleBtn.classList.add('saving-indicator');
+                submitAdminScheduleBtn.textContent = 'Guardando';
+
+                try {
+                    const result = await apiFetch(endpoint, {
+                        method: method,
+                        body: JSON.stringify(data)
+                    });
+                    console.log(`Cita ${isEditMode ? 'actualizada' : 'creada'}:`, result);
+
+                    hideAdminModal();
+                    loadAllAppointments(); // Recargar tabla
+                    alert(`¡Cita ${isEditMode ? 'actualizada' : 'creada'} con éxito!`);
+
+                } catch (error) {
+                    // El error ya se muestra por apiFetch en apiErrorMessageDiv o adminFeedbackDiv
+                     if (!adminFeedbackDiv.textContent && apiErrorMessageDiv.textContent) {
+                         adminFeedbackDiv.textContent = apiErrorMessageDiv.textContent; // Mostrar error específico del form si no hay otro
+                     } else if (!adminFeedbackDiv.textContent) {
+                         adminFeedbackDiv.textContent = `Error: ${error.message || 'Error desconocido'}`;
+                     }
+                } finally {
+                     submitAdminScheduleBtn.disabled = false;
+                     submitAdminScheduleBtn.classList.remove('saving-indicator');
+                     submitAdminScheduleBtn.textContent = 'Guardar Cita';
+                }
+             });
+
+
+            // Listeners para acciones en la tabla
+            appointmentsTableBody.addEventListener('click', async (event) => {
+                const target = event.target;
+                const row = target.closest('.appointment-row');
+                if (!row) return;
+
+                const appointmentId = row.dataset.appointmentId;
+
+                // --- Editar ---
+                if (target.classList.contains('edit-btn')) {
+                    console.log(`Editar cita ID: ${appointmentId}`);
+                    // Reconstruir datos desde atributos data-* de la fila
+                    const appointmentData = {
+                        AppointmentID: appointmentId,
+                        UserID: row.dataset.userId,
+                        User: { FullName: row.dataset.clientName },
+                        AppointmentDateTime: row.dataset.datetime, // Usar el ISO string original
+                        VehicleDescription: row.dataset.vehicle,
+                        ServiceType: row.dataset.service,
+                        Status: row.dataset.status,
+                        Notes: row.dataset.notes,
+                    };
+                     // Validar que los datos necesarios existen
+                    if(appointmentData.AppointmentDateTime && appointmentData.UserID){
+                       showAdminModal(true, appointmentData);
+                    } else {
+                         console.error("Faltan datos en la fila para editar:", row.dataset);
+                         alert("Error: No se pudieron cargar los datos completos para editar.");
+                    }
+
+                // --- Eliminar ---
+                } else if (target.classList.contains('delete-btn')) {
+                    console.log(`Eliminar cita ID: ${appointmentId}`);
+                     if (confirm(`¿Está seguro que desea eliminar la cita ID ${appointmentId}?`)) {
+                         target.disabled = true;
+                         target.textContent = 'Eliminando...';
+                         hideApiError();
+
+                         try {
+                             await apiFetch(`/api/appointments/${appointmentId}`, { method: 'DELETE' });
+                             console.log(`Cita ${appointmentId} eliminada.`);
+                             row.remove(); // Eliminar fila visualmente
+                             alert(`Cita ID ${appointmentId} eliminada.`);
+                             if (appointmentsTableBody.children.length === 0 || (appointmentsTableBody.children.length === 1 && appointmentsTableBody.firstChild.id === 'loading-row')) {
+                                noResultsDiv.classList.remove('hidden');
+                            }
+                         } catch (error) {
+                             // El error ya se muestra por apiFetch
+                             target.disabled = false; // Rehabilitar botón si falla
+                             target.textContent = 'Eliminar';
+                         }
+                     }
+
+                 // --- Guardar Estado ---
+                 } else if (target.classList.contains('update-status-btn')) {
+                     const selectElement = row.querySelector('.status-select');
+                     const newStatus = selectElement.value;
+                     console.log(`Actualizar estado cita ID: ${appointmentId} a ${newStatus}`);
+                     target.disabled = true;
+                     target.classList.add('saving-indicator');
+                     target.textContent = 'Guardando'; // El CSS se encarga de los puntos
+                     hideApiError();
+
+                     try {
+                         const result = await apiFetch(`/api/appointments/${appointmentId}/status`, {
+                             method: 'PATCH',
+                             body: JSON.stringify({ status: newStatus })
+                         });
+                         console.log(`Estado actualizado:`, result);
+                         selectElement.dataset.originalStatus = newStatus; // Actualizar estado 'original'
+                         row.dataset.status = newStatus; // Actualizar data-status de la fila
+                         target.style.display = 'none'; // Ocultar botón guardar
+                         target.classList.remove('saving-indicator');
+
+
+                     } catch (error) {
+                         // El error ya se muestra por apiFetch
+                         selectElement.value = selectElement.dataset.originalStatus; // Revertir select
+                          target.disabled = false;
+                          target.classList.remove('saving-indicator');
+                         target.textContent = 'Guardar';
+                         // No ocultar el botón si falló, permitir reintentar
+                         target.style.display = 'inline';
+                     } finally {
+                         // Asegurar que el texto vuelva a la normalidad si no se oculta
+                         if(target.style.display !== 'none'){
+                              target.textContent = 'Guardar';
+                              target.classList.remove('saving-indicator');
+                         }
+                     }
+                 }
+            });
+
+            // Listener para cambios en el select de estado
+             appointmentsTableBody.addEventListener('change', (event) => {
+                 if (event.target.classList.contains('status-select')) {
+                     const selectElement = event.target;
+                     const saveButton = selectElement.nextElementSibling;
+                     if (selectElement.value !== selectElement.dataset.originalStatus) {
+                         saveButton.style.display = 'inline';
+                         saveButton.disabled = false;
+                         saveButton.textContent = 'Guardar';
+                         saveButton.classList.remove('saving-indicator');
+                     } else {
+                         saveButton.style.display = 'none';
+                     }
+                 }
+             });
+
+            // Carga inicial de citas
+            loadAllAppointments();
+        });
     </script>
 
-    <footer class="bg-gray-800 text-white py-3 px-4 mt-6 text-center text-sm">
-        <p>&copy; 2024 AutoCare Rodriguez. Todos los derechos reservados.</p>
-    </footer>
 </body>
 </html>
