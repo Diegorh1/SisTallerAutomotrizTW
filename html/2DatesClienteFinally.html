@@ -6,15 +6,18 @@
     <title>Portal Cliente - AutoCare Rodriguez</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
+        /* Estilos para indicador de carga y estrellas */
         .saving-indicator::after { content: '...'; display: inline-block; animation: dots 1s steps(5, end) infinite; }
         @keyframes dots { 0%, 20% { content: '.'; } 40% { content: '..'; } 60%, 100% { content: '...'; } }
         button:disabled { opacity: 0.6; cursor: not-allowed; }
-         /* Clases para status */
+         /* Clases para status (mejor legibilidad que solo Tailwind) */
         .status-pending { background-color: #fef3c7; color: #92400e; } /* bg-yellow-100 text-yellow-800 */
         .status-in_progress { background-color: #dbeafe; color: #1e40af; } /* bg-blue-100 text-blue-800 */
         .status-completed { background-color: #d1fae5; color: #065f46; } /* bg-green-100 text-green-800 */
         .status-cancelled { background-color: #fee2e2; color: #991b1b; } /* bg-red-100 text-red-800 */
         .status-default { background-color: #f3f4f6; color: #1f2937; } /* bg-gray-100 text-gray-800 */
+        /* Estilo para estrellas */
+        .star.text-yellow-500 { color: #f59e0b; } /* Amarillo para estrellas seleccionadas */
     </style>
 </head>
 <body class="bg-gray-50">
@@ -23,7 +26,8 @@
         <div class="flex items-center justify-between">
             <h1 class="text-2xl font-bold">AutoCare Rodriguez</h1>
             <div class="flex items-center space-x-4">
-                <span id="welcome-message" class="text-sm hidden"></span> <a href="#upcoming-section">
+                <span id="welcome-message" class="text-sm hidden"></span>
+                <a href="#upcoming-section">
                     <button class="px-4 py-2 rounded hover:bg-gray-700">Próximas Citas</button>
                 </a>
                 <a href="#history-section">
@@ -40,27 +44,27 @@
         <div id="api-error-message" class="mb-4 p-3 text-red-700 bg-red-100 border border-red-400 rounded hidden"></div>
 
         <section id="upcoming-section" class="mb-8">
-             <h2 class="text-3xl font-semibold text-gray-800 mb-6">Mis Próximas Citas</h2>
+            <h2 class="text-3xl font-semibold text-gray-800 mb-6">Mis Próximas Citas</h2>
             <div id="upcoming-appointments-list" class="bg-white rounded-lg shadow p-6 space-y-4 min-h-[100px] relative">
-                 <div id="loading-upcoming" class="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center hidden">
-                     <p class="text-gray-500">Cargando citas...</p>
+                <div id="loading-upcoming" class="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center hidden">
+                    <p class="text-gray-500">Cargando citas...</p>
                 </div>
-                 </div>
-         </section>
+                </div>
+        </section>
 
-         <section id="history-section" class="mb-8">
-             <h2 class="text-3xl font-semibold text-gray-800 mb-6">Historial de Servicios</h2>
+        <section id="history-section" class="mb-8">
+            <h2 class="text-3xl font-semibold text-gray-800 mb-6">Historial de Servicios</h2>
             <div id="service-history-list" class="bg-white rounded-lg shadow p-6 space-y-4 min-h-[100px] relative">
                 <div id="loading-history" class="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center hidden">
-                     <p class="text-gray-500">Cargando historial...</p>
+                    <p class="text-gray-500">Cargando historial...</p>
                 </div>
                 </div>
-         </section>
-     </div>
+        </section>
+    </div>
 
-     <div id="scheduleModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto p-4">
-         <div class="bg-white rounded-lg p-8 max-w-2xl w-full m-auto">
-             <div class="flex justify-between items-center mb-6">
+    <div id="scheduleModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto p-4">
+        <div class="bg-white rounded-lg p-8 max-w-2xl w-full m-auto">
+            <div class="flex justify-between items-center mb-6">
                 <h3 class="text-2xl font-semibold">Agendar Nueva Cita</h3>
                 <button id="close-schedule-modal-btn" class="text-gray-500 hover:text-gray-700">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
@@ -107,6 +111,47 @@
         </div>
     </div>
 
+    <div id="feedbackModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto p-4">
+        <div class="bg-white rounded-lg p-8 max-w-lg w-full m-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-semibold">Tu Opinión Sobre el Servicio</h3>
+                <button id="close-feedback-modal-btn" class="text-gray-500 hover:text-gray-700">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="mb-4 p-3 bg-gray-100 rounded border border-gray-200 text-sm">
+                <p><strong>Servicio:</strong> <span id="feedback-service-type"></span></p>
+                <p><strong>Vehículo:</strong> <span id="feedback-vehicle"></span></p>
+                <p><strong>Fecha:</strong> <span id="feedback-date"></span></p>
+            </div>
+            <form id="feedback-form" class="space-y-4">
+                <input type="hidden" id="feedback-appointment-id" name="appointmentId">
+                <div>
+                    <label for="feedback-rating" class="block text-sm font-medium text-gray-700 mb-1">Calificación (1-5 estrellas):</label>
+                    <div id="feedback-stars" class="flex space-x-1 text-2xl text-gray-400 cursor-pointer">
+                        <span data-value="1" class="star">☆</span>
+                        <span data-value="2" class="star">☆</span>
+                        <span data-value="3" class="star">☆</span>
+                        <span data-value="4" class="star">☆</span>
+                        <span data-value="5" class="star">☆</span>
+                    </div>
+                    <input type="hidden" id="feedback-rating" name="rating">
+                </div>
+                <div>
+                    <label for="feedback-comments" class="block text-sm font-medium text-gray-700 mb-1">Comentarios:</label>
+                    <textarea id="feedback-comments" name="comments" class="w-full px-3 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500" rows="4" placeholder="¿Cómo fue tu experiencia? (Opcional)"></textarea>
+                </div>
+                <div id="feedback-form-feedback" class="text-red-600 text-sm mt-2"></div>
+                <div class="flex justify-end space-x-4">
+                    <button type="button" id="cancel-feedback-btn" class="px-6 py-2 border rounded-lg hover:bg-gray-100">Cancelar</button>
+                    <button type="button" id="submit-feedback-btn" class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                        Enviar Opinión
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <footer class="bg-gray-800 text-white py-6 px-6 mt-8">
         <div class="container mx-auto text-center">
              <p>&copy; <span id="current-year"></span> AutoCare Rodriguez. Todos los derechos reservados.</p>
@@ -116,203 +161,236 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             // --- CONFIGURACIÓN ---
-            const API_BASE_URL = 'http://localhost:3000'; // Ajusta si es necesario
+            const API_BASE_URL = 'http://localhost:3000'; // Ajusta si tu API corre en otro puerto/host
 
             // --- SIMULACIÓN DE USUARIO ACTUAL ---
             // ¡¡¡ CAMBIA ESTOS VALORES POR UN USUARIO REAL DE TU BASE DE DATOS !!!
-            const CURRENT_USER_ID = 17; // ID del usuario logueado (simulado)
-            const CURRENT_USER_IDENTIFIER = '12@gmail.com'; // Email o Nombre Completo (simulado)
+            const CURRENT_USER_ID = 17; // <<<<<<<< ID del usuario (ej: 1, 2, etc.)
+            const CURRENT_USER_IDENTIFIER = '12@gmail.com'; // <<<<< Email o Nombre Completo del usuario con ese ID
             // --------------------------------------
 
-             // --- Elementos del DOM ---
-             const scheduleModal = document.getElementById('scheduleModal');
-             const openModalBtn = document.getElementById('open-schedule-modal-btn');
-             const closeModalBtn = document.getElementById('close-schedule-modal-btn');
-             const cancelModalBtn = document.getElementById('cancel-schedule-btn');
-             const scheduleForm = document.getElementById('schedule-form');
-             const submitScheduleBtn = document.getElementById('submit-schedule-btn');
-             const feedbackDiv = document.getElementById('schedule-form-feedback');
-             const upcomingListDiv = document.getElementById('upcoming-appointments-list');
-             const historyListDiv = document.getElementById('service-history-list');
-             const loadingUpcomingDiv = document.getElementById('loading-upcoming');
-             const loadingHistoryDiv = document.getElementById('loading-history');
-             const apiErrorMessageDiv = document.getElementById('api-error-message');
-             const welcomeMessageSpan = document.getElementById('welcome-message');
+            // --- Elementos del DOM ---
+            const scheduleModal = document.getElementById('scheduleModal');
+            const openModalBtn = document.getElementById('open-schedule-modal-btn');
+            const closeModalBtn = document.getElementById('close-schedule-modal-btn');
+            const cancelModalBtn = document.getElementById('cancel-schedule-btn');
+            const scheduleForm = document.getElementById('schedule-form');
+            const submitScheduleBtn = document.getElementById('submit-schedule-btn');
+            const feedbackDiv = document.getElementById('schedule-form-feedback');
+            const upcomingListDiv = document.getElementById('upcoming-appointments-list');
+            const historyListDiv = document.getElementById('service-history-list');
+            const loadingUpcomingDiv = document.getElementById('loading-upcoming');
+            const loadingHistoryDiv = document.getElementById('loading-history');
+            const apiErrorMessageDiv = document.getElementById('api-error-message');
+            const welcomeMessageSpan = document.getElementById('welcome-message');
+            // Elementos del Modal de Feedback
+            const feedbackModal = document.getElementById('feedbackModal');
+            const closeFeedbackModalBtn = document.getElementById('close-feedback-modal-btn');
+            const cancelFeedbackBtn = document.getElementById('cancel-feedback-btn');
+            const feedbackForm = document.getElementById('feedback-form');
+            const submitFeedbackBtn = document.getElementById('submit-feedback-btn');
+            const feedbackAppointmentIdInput = document.getElementById('feedback-appointment-id');
+            const feedbackServiceTypeSpan = document.getElementById('feedback-service-type');
+            const feedbackVehicleSpan = document.getElementById('feedback-vehicle');
+            const feedbackDateSpan = document.getElementById('feedback-date');
+            const feedbackStarsDiv = document.getElementById('feedback-stars');
+            const feedbackRatingInput = document.getElementById('feedback-rating');
+            const feedbackCommentsTextarea = document.getElementById('feedback-comments');
+            const feedbackFormFeedbackDiv = document.getElementById('feedback-form-feedback');
 
 
             // --- Funciones Auxiliares ---
             function showApiError(message) {
                 apiErrorMessageDiv.textContent = `Error: ${message}`;
                 apiErrorMessageDiv.classList.remove('hidden');
-                // Ocultar después de unos segundos
-                setTimeout(() => {
-                   hideApiError();
-                }, 5000);
+                setTimeout(() => hideApiError(), 5000); // Ocultar después de 5s
             }
             function hideApiError() {
                 apiErrorMessageDiv.classList.add('hidden');
                 apiErrorMessageDiv.textContent = '';
             }
             // Función genérica para fetch (sin autenticación)
-             async function apiFetch(endpoint, options = {}) {
-                options.headers = {
-                    'Content-Type': 'application/json',
-                    ...options.headers,
-                };
-
+            async function apiFetch(endpoint, options = {}) {
+                options.headers = { 'Content-Type': 'application/json', ...options.headers };
                 try {
                     const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
-                    hideApiError(); // Ocultar error previo
-
+                    hideApiError();
                     if (!response.ok) {
                         let errorData = { message: `Error HTTP ${response.status}: ${response.statusText}` };
-                        try {
-                            const jsonError = await response.json();
-                            errorData.message = jsonError.message || errorData.message; // Usar mensaje de API si existe
-                        } catch (e) { /* Ignorar si no hay cuerpo JSON */ }
-                        console.error(`API Error ${response.status}:`, errorData.message);
-                        showApiError(errorData.message);
+                        try { errorData.message = (await response.json()).message || errorData.message; } catch (e) {}
                         throw new Error(errorData.message);
                     }
-
-                    if (response.status === 204) { // No Content
-                        return null;
-                    }
-                    return await response.json();
+                    return response.status === 204 ? null : await response.json();
                 } catch (error) {
-                    if (!apiErrorMessageDiv.classList.contains('hidden')) {
-                         // Error ya mostrado por respuesta HTTP
-                    } else {
-                        console.error('Fetch/Network Error:', error);
-                        showApiError(error.message || 'Error de conexión con el servidor.');
-                    }
+                    console.error('API Fetch Error:', error);
+                    showApiError(error.message || 'Error de conexión.');
                     throw error;
                 }
             }
-             function setLoadingState(listDiv, loadingDiv, isLoading) {
-                 if (isLoading) {
-                     loadingDiv.classList.remove('hidden');
-                     listDiv.innerHTML = ''; // Limpiar contenido previo mientras carga
-                 } else {
-                     loadingDiv.classList.add('hidden');
-                 }
-             }
-             function getStatusClass(status) {
-                 switch (status?.toLowerCase()) {
-                     case 'pending': return 'status-pending';
-                     case 'in_progress': return 'status-in_progress';
-                     case 'completed': return 'status-completed';
-                     case 'cancelled': return 'status-cancelled';
-                     default: return 'status-default';
-                 }
-             }
+            function setLoadingState(listDiv, loadingDiv, isLoading) {
+                loadingDiv.style.display = isLoading ? 'flex' : 'none'; // Usar display flex para centrar
+                if(isLoading) listDiv.innerHTML = '';
+            }
+            function getStatusClass(status) {
+                const statusMap = {
+                    'pending': 'status-pending',
+                    'in_progress': 'status-in_progress',
+                    'completed': 'status-completed',
+                    'cancelled': 'status-cancelled'
+                };
+                return statusMap[status?.toLowerCase()] || 'status-default';
+            }
 
 
             // --- Modal Handling ---
-            const showModal = () => scheduleModal.classList.remove('hidden');
-            const hideModal = () => {
+            const showScheduleModal = () => scheduleModal.classList.remove('hidden');
+            const hideScheduleModal = () => {
                  scheduleModal.classList.add('hidden');
                  scheduleForm.reset();
                  feedbackDiv.textContent = '';
             }
-            openModalBtn.addEventListener('click', showModal);
-            closeModalBtn.addEventListener('click', hideModal);
-            cancelModalBtn.addEventListener('click', hideModal);
+            openModalBtn.addEventListener('click', showScheduleModal);
+            closeModalBtn.addEventListener('click', hideScheduleModal);
+            cancelModalBtn.addEventListener('click', hideScheduleModal);
 
+            const showFeedbackModal = () => feedbackModal.classList.remove('hidden');
+            const hideFeedbackModal = () => {
+                 feedbackModal.classList.add('hidden');
+                 feedbackForm.reset();
+                 resetStars();
+                 feedbackFormFeedbackDiv.textContent = '';
+            }
+            closeFeedbackModalBtn.addEventListener('click', hideFeedbackModal);
+            cancelFeedbackBtn.addEventListener('click', hideFeedbackModal);
+
+
+             // --- Sistema de Estrellas ---
+             let currentRating = 0;
+             feedbackStarsDiv.addEventListener('click', (e) => {
+                 if (e.target.classList.contains('star')) {
+                     currentRating = parseInt(e.target.dataset.value);
+                     feedbackRatingInput.value = currentRating;
+                     updateStarsUI(currentRating);
+                 }
+             });
+             feedbackStarsDiv.addEventListener('mouseover', (e) => {
+                  if (e.target.classList.contains('star')) {
+                     updateStarsUI(parseInt(e.target.dataset.value), true); // Preview
+                  }
+             });
+              feedbackStarsDiv.addEventListener('mouseout', () => {
+                  updateStarsUI(currentRating); // Volver al rating seleccionado
+              });
+              function updateStarsUI(rating, isPreview = false) {
+                  const stars = feedbackStarsDiv.querySelectorAll('.star');
+                  stars.forEach(star => {
+                      const starValue = parseInt(star.dataset.value);
+                      star.textContent = starValue <= rating ? '★' : '☆';
+                      star.classList.toggle('text-yellow-500', starValue <= rating);
+                      star.classList.toggle('text-gray-400', starValue > rating);
+                      star.classList.toggle('opacity-70', isPreview && starValue <= rating); // Indicar preview
+                  });
+              }
+              function resetStars() {
+                 currentRating = 0;
+                 feedbackRatingInput.value = '';
+                 updateStarsUI(0);
+              }
 
             // --- Carga y Renderizado de Citas ---
             async function loadAppointments() {
-                 setLoadingState(upcomingListDiv, loadingUpcomingDiv, true);
-                 setLoadingState(historyListDiv, loadingHistoryDiv, true);
-                 hideApiError();
-
-                 try {
-                     // Pedimos TODAS las citas (la API actual no filtra por UserID en GET)
-                     const allAppointments = await apiFetch('/api/appointments');
-
-                    // Filtramos las citas del USUARIO ACTUAL (simulado) en el frontend
+                setLoadingState(upcomingListDiv, loadingUpcomingDiv, true);
+                setLoadingState(historyListDiv, loadingHistoryDiv, true);
+                hideApiError();
+                try {
+                    const allAppointments = await apiFetch('/api/appointments');
                     const userAppointments = allAppointments.filter(app => app.UserID === CURRENT_USER_ID);
 
-                    // Separamos en próximas e historial
                     const upcoming = [];
                     const history = [];
                     const now = new Date();
-
                     userAppointments.forEach(app => {
                         const appDate = new Date(app.AppointmentDateTime);
-                        // Considerar Próximas si no están canceladas o completadas (y son futuras o recientes)
                         if ((app.Status === 'pending' || app.Status === 'in_progress') && appDate >= now) {
                            upcoming.push(app);
-                        } else { // El resto va al historial
+                        } else {
                             history.push(app);
                         }
                     });
-
-                     // Ordenar: Próximas por fecha ascendente, Historial por fecha descendente
                     upcoming.sort((a, b) => new Date(a.AppointmentDateTime) - new Date(b.AppointmentDateTime));
                     history.sort((a, b) => new Date(b.AppointmentDateTime) - new Date(a.AppointmentDateTime));
 
+                    setLoadingState(upcomingListDiv, loadingUpcomingDiv, false);
+                    upcomingListDiv.innerHTML = '';
+                    if (upcoming.length > 0) { upcoming.forEach(renderUpcomingAppointmentItem); }
+                    else { upcomingListDiv.innerHTML = '<p class="text-gray-500 text-center py-4">No tienes citas próximas.</p>'; }
 
-                     // Renderizar
-                     setLoadingState(upcomingListDiv, loadingUpcomingDiv, false);
-                     upcomingListDiv.innerHTML = ''; // Limpiar por si acaso
-                     if (upcoming.length > 0) {
-                         upcoming.forEach(renderUpcomingAppointmentItem);
-                     } else {
-                         upcomingListDiv.innerHTML = '<p class="text-gray-500 text-center py-4">No tienes citas próximas.</p>';
-                     }
-
-                     setLoadingState(historyListDiv, loadingHistoryDiv, false);
-                     historyListDiv.innerHTML = ''; // Limpiar por si acaso
-                     if (history.length > 0) {
-                         history.forEach(renderHistoryItem);
-                     } else {
-                         historyListDiv.innerHTML = '<p class="text-gray-500 text-center py-4">No tienes historial de servicios.</p>';
-                     }
-
-                 } catch (error) {
-                    console.error('Error cargando citas:', error);
-                    // Mostrar error en ambas secciones si falla la carga
+                    setLoadingState(historyListDiv, loadingHistoryDiv, false);
+                    historyListDiv.innerHTML = '';
+                    if (history.length > 0) { history.forEach(renderHistoryItem); }
+                    else { historyListDiv.innerHTML = '<p class="text-gray-500 text-center py-4">No tienes historial de servicios.</p>'; }
+                } catch (error) {
                     setLoadingState(upcomingListDiv, loadingUpcomingDiv, false);
                     setLoadingState(historyListDiv, loadingHistoryDiv, false);
-                    if (!apiErrorMessageDiv.classList.contains('hidden')) {
-                         // El error ya se está mostrando globalmente
-                         upcomingListDiv.innerHTML = '<p class="text-red-500 text-center py-4">Error al cargar. Intente más tarde.</p>';
-                         historyListDiv.innerHTML = '<p class="text-red-500 text-center py-4">Error al cargar. Intente más tarde.</p>';
-                    }
-                    // Si no se mostró, el error se maneja en apiFetch
-                 }
+                     // El error ya se muestra globalmente
+                    upcomingListDiv.innerHTML = '<p class="text-red-500 text-center py-4">Error al cargar citas.</p>';
+                    historyListDiv.innerHTML = '<p class="text-red-500 text-center py-4">Error al cargar historial.</p>';
+                }
             }
 
-             function renderUpcomingAppointmentItem(appointment) {
-                 const localDateTime = new Date(appointment.AppointmentDateTime).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' });
-                 const statusClass = getStatusClass(appointment.Status);
-                 const statusText = appointment.Status.replace('_', ' '); // "in progress"
+            function renderUpcomingAppointmentItem(appointment) {
+                const localDateTime = new Date(appointment.AppointmentDateTime).toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' });
+                const statusClass = getStatusClass(appointment.Status);
+                const statusText = appointment.Status.replace('_', ' ');
 
-                 const itemHTML = `
-                     <div class="border rounded-lg p-4 appointment-item" data-appointment-id="${appointment.AppointmentID}">
-                         <div class="flex justify-between items-center flex-wrap gap-2">
-                             <span class="font-medium appointment-datetime">${localDateTime}</span>
-                             <span class="px-2 py-1 ${statusClass} rounded-full text-xs font-semibold uppercase tracking-wide appointment-status">${statusText}</span>
-                         </div>
-                         <p class="text-gray-700 mt-2 appointment-details">
-                             <span class="font-semibold">Servicio:</span> ${appointment.ServiceType} <br>
-                             <span class="font-semibold">Vehículo:</span> ${appointment.VehicleDescription}
-                         </p>
-                         ${appointment.Notes ? `<p class="text-sm text-gray-500 mt-1">Notas Cliente: ${appointment.Notes}</p>` : ''}
-                         <div class="mt-3 flex space-x-3">
-                             ${appointment.Status === 'pending' || appointment.Status === 'in_progress' ?
-                             `<button class="text-red-600 hover:text-red-800 text-sm font-medium cancel-btn">Cancelar Cita</button>` : ''
-                             }
-                         </div>
-                     </div>`;
-                 upcomingListDiv.insertAdjacentHTML('beforeend', itemHTML);
-             }
+                const itemHTML = `
+                    <div class="border rounded-lg p-4 appointment-item" data-appointment-id="${appointment.AppointmentID}">
+                        <div class="flex justify-between items-center flex-wrap gap-2">
+                            <span class="font-medium appointment-datetime">${localDateTime}</span>
+                            <span class="px-2 py-1 ${statusClass} rounded-full text-xs font-semibold uppercase tracking-wide appointment-status">${statusText}</span>
+                        </div>
+                        <p class="text-gray-700 mt-2 appointment-details">
+                            <span class="font-semibold">Servicio:</span> ${appointment.ServiceType} <br>
+                            <span class="font-semibold">Vehículo:</span> ${appointment.VehicleDescription}
+                        </p>
+                        ${appointment.Notes ? `<p class="text-sm text-gray-500 mt-1">Notas Cliente: ${appointment.Notes}</p>` : ''}
+                        <div class="mt-3 flex space-x-3">
+                            ${appointment.Status === 'pending' || appointment.Status === 'in_progress' ?
+                            `<button class="text-red-600 hover:text-red-800 text-sm font-medium cancel-btn">Cancelar Cita</button>` : ''
+                            }
+                        </div>
+                    </div>`;
+                upcomingListDiv.insertAdjacentHTML('beforeend', itemHTML);
+            }
 
-             function renderHistoryItem(appointment) {
+            function renderHistoryItem(appointment) {
                  const localDate = new Date(appointment.AppointmentDateTime).toLocaleDateString('es-MX', { dateStyle: 'long' });
                  const statusClass = getStatusClass(appointment.Status);
                  const statusText = appointment.Status.replace('_', ' ');
+                 let feedbackSectionHTML = '';
+
+                 if (appointment.Status === 'completed') {
+                     if (appointment.Feedback) {
+                         const submittedDate = new Date(appointment.Feedback.SubmittedAt).toLocaleDateString('es-MX', { dateStyle: 'short' });
+                         feedbackSectionHTML = `
+                             <div class="mt-3 pt-3 border-t border-gray-200">
+                                 <p class="text-sm font-semibold text-gray-700">Tu Opinión (${submittedDate}):</p>
+                                 ${appointment.Feedback.Rating ? `<p class="text-yellow-500 text-lg">${'★'.repeat(appointment.Feedback.Rating)}${'☆'.repeat(5 - appointment.Feedback.Rating)}</p>` : ''}
+                                 ${appointment.Feedback.Comments ? `<p class="text-sm text-gray-600 italic">"${appointment.Feedback.Comments}"</p>` : '<p class="text-sm text-gray-500 italic">(No dejaste comentarios)</p>'}
+                             </div>`;
+                     } else {
+                         feedbackSectionHTML = `
+                             <div class="mt-3 pt-3 border-t border-gray-200">
+                                 <button class="text-green-600 hover:text-green-800 text-sm font-medium open-feedback-btn"
+                                         data-appointment-id="${appointment.AppointmentID}"
+                                         data-service="${appointment.ServiceType}"
+                                         data-vehicle="${appointment.VehicleDescription}"
+                                         data-date="${localDate}">
+                                     Dejar Opinión sobre este Servicio
+                                 </button>
+                             </div>`;
+                     }
+                 }
 
                  const itemHTML = `
                      <div class="border rounded-lg p-4 history-item opacity-90" data-appointment-id="${appointment.AppointmentID}">
@@ -325,136 +403,128 @@
                              <span class="font-semibold">Vehículo:</span> ${appointment.VehicleDescription}
                          </p>
                           ${appointment.Notes ? `<p class="text-sm text-gray-500 mt-1">Notas Cliente: ${appointment.Notes}</p>` : ''}
-                         </div>`;
+                         ${feedbackSectionHTML}
+                     </div>`;
                  historyListDiv.insertAdjacentHTML('beforeend', itemHTML);
-             }
+            }
 
 
             // --- Agendar Cita ---
-             submitScheduleBtn.addEventListener('click', async () => {
+            submitScheduleBtn.addEventListener('click', async () => {
                  feedbackDiv.textContent = '';
                  hideApiError();
                  const formData = new FormData(scheduleForm);
-
-                 // Validar y combinar fecha/hora
                  const dateValue = formData.get('appointmentDate');
                  const timeValue = formData.get('appointmentTime');
                  let combinedDateTimeISO = null;
+
                  if (dateValue && timeValue) {
-                     // Intentar crear fecha en UTC para consistencia
                      const dateObj = new Date(`${dateValue}T${timeValue}:00`);
                      if (!isNaN(dateObj.getTime())) {
-                        // Comparar con la fecha actual para evitar agendar en el pasado
-                        const now = new Date();
-                        // Quitar segundos/milisegundos para comparación más justa
-                        now.setSeconds(0, 0);
-                        dateObj.setSeconds(0,0);
-
+                        const now = new Date(); now.setSeconds(0,0); dateObj.setSeconds(0,0);
                         if (dateObj < now) {
-                            feedbackDiv.textContent = 'No puedes agendar citas en el pasado.';
-                            return;
+                           feedbackDiv.textContent = 'No puedes agendar citas en el pasado.'; return;
                         }
-                         combinedDateTimeISO = dateObj.toISOString();
-                     } else {
-                        feedbackDiv.textContent = 'Fecha u hora inválida.';
-                        return;
-                     }
+                        combinedDateTimeISO = dateObj.toISOString();
+                     } else { feedbackDiv.textContent = 'Fecha u hora inválida.'; return; }
                  }
 
                  const data = {
-                     clientIdentifier: CURRENT_USER_IDENTIFIER, // <- Identificador del usuario simulado
+                     clientIdentifier: CURRENT_USER_IDENTIFIER,
                      appointmentDateTime: combinedDateTimeISO,
                      vehicleDescription: formData.get('vehicleDescription'),
                      serviceType: formData.get('serviceType'),
                      notes: formData.get('notes') || null,
-                     status: 'pending' // <- El cliente siempre agenda como pendiente
+                     status: 'pending'
                  };
 
-                // Validación básica de campos requeridos
                  if (!data.appointmentDateTime || !data.vehicleDescription || !data.serviceType || !data.clientIdentifier) {
-                     feedbackDiv.textContent = 'Por favor, complete Fecha, Hora, Vehículo y Servicio.';
-                     return;
+                     feedbackDiv.textContent = 'Por favor, complete Fecha, Hora, Vehículo y Servicio.'; return;
                  }
 
-                 console.log('Enviando datos a POST /api/appointments:', data);
                  submitScheduleBtn.disabled = true;
                  submitScheduleBtn.classList.add('saving-indicator');
                  submitScheduleBtn.textContent = 'Agendando';
-
                  try {
-                     const newAppointment = await apiFetch('/api/appointments', {
-                         method: 'POST',
-                         body: JSON.stringify(data)
-                     });
+                     const newAppointment = await apiFetch('/api/appointments', { method: 'POST', body: JSON.stringify(data) });
                      console.log('Cita agendada:', newAppointment);
-                     hideModal();
-                     loadAppointments(); // Recargar lista
+                     hideScheduleModal();
+                     loadAppointments();
                      alert('¡Cita agendada con éxito!');
-
                  } catch (error) {
-                     // El error ya se mostró por apiFetch o validación previa
-                      if (!feedbackDiv.textContent && apiErrorMessageDiv.textContent) {
-                         feedbackDiv.textContent = apiErrorMessageDiv.textContent;
-                     } else if (!feedbackDiv.textContent) {
-                         feedbackDiv.textContent = `Error: ${error.message || 'Error desconocido al agendar.'}`;
-                     }
+                     if (!feedbackDiv.textContent) feedbackDiv.textContent = error.message || 'Error al agendar.';
                  } finally {
                      submitScheduleBtn.disabled = false;
                      submitScheduleBtn.classList.remove('saving-indicator');
                      submitScheduleBtn.textContent = 'Agendar';
                  }
-             });
+            });
 
             // --- Cancelar Cita ---
-             upcomingListDiv.addEventListener('click', async (event) => {
-                 if (event.target.classList.contains('cancel-btn')) {
-                     const button = event.target;
-                     const appointmentItem = button.closest('.appointment-item');
-                     const appointmentId = appointmentItem?.dataset.appointmentId;
+            upcomingListDiv.addEventListener('click', async (event) => {
+                if (event.target.classList.contains('cancel-btn')) {
+                    const button = event.target;
+                    const appointmentItem = button.closest('.appointment-item');
+                    const appointmentId = appointmentItem?.dataset.appointmentId;
+                    if (!appointmentId || !confirm(`¿Está seguro que desea cancelar esta cita?`)) return;
 
-                     if (!appointmentId) return;
+                    button.disabled = true; button.textContent = 'Cancelando...'; hideApiError();
+                    try {
+                        await apiFetch(`/api/appointments/${appointmentId}/status`, { method: 'PATCH', body: JSON.stringify({ status: 'cancelled' }) });
+                        console.log(`Cita ${appointmentId} marcada como cancelada.`);
+                        alert('Cita cancelada.');
+                        loadAppointments();
+                    } catch (error) {
+                         button.disabled = false; button.textContent = 'Cancelar Cita';
+                    }
+                }
+            });
 
-                     if (confirm(`¿Está seguro que desea cancelar esta cita?`)) {
-                         button.disabled = true;
-                         button.textContent = 'Cancelando...';
-                         hideApiError();
+            // --- Manejo de Feedback ---
+            historyListDiv.addEventListener('click', (event) => {
+                if (event.target.classList.contains('open-feedback-btn')) {
+                    const button = event.target;
+                    feedbackAppointmentIdInput.value = button.dataset.appointmentId;
+                    feedbackServiceTypeSpan.textContent = button.dataset.service;
+                    feedbackVehicleSpan.textContent = button.dataset.vehicle;
+                    feedbackDateSpan.textContent = button.dataset.date;
+                    feedbackForm.reset(); resetStars(); feedbackFormFeedbackDiv.textContent = ''; hideApiError();
+                    showFeedbackModal();
+                }
+            });
 
-                         try {
-                             // Opción 1: Cambiar estado a 'cancelled' (si quieres mantener registro)
-                              await apiFetch(`/api/appointments/${appointmentId}/status`, {
-                                  method: 'PATCH',
-                                  body: JSON.stringify({ status: 'cancelled' })
-                              });
-                             console.log(`Cita ${appointmentId} marcada como cancelada.`);
-                              alert('Cita cancelada.');
+            submitFeedbackBtn.addEventListener('click', async () => {
+                feedbackFormFeedbackDiv.textContent = ''; hideApiError();
+                const appointmentId = feedbackAppointmentIdInput.value;
+                const rating = feedbackRatingInput.value ? parseInt(feedbackRatingInput.value) : null;
+                const comments = feedbackCommentsTextarea.value.trim() || null;
 
-                             // Opción 2: Eliminar completamente (Descomenta si prefieres esto)
-                             // await apiFetch(`/api/appointments/${appointmentId}`, { method: 'DELETE' });
-                             // console.log(`Cita ${appointmentId} eliminada.`);
-                             // alert('Cita eliminada.');
+                if (!appointmentId) { feedbackFormFeedbackDiv.textContent = 'Error: No se encontró ID.'; return; }
+                if (rating === null && comments === null) { feedbackFormFeedbackDiv.textContent = 'Debe dar calificación o comentario.'; return; }
+                if (rating !== null && (isNaN(rating) || rating < 1 || rating > 5)) { feedbackFormFeedbackDiv.textContent = 'Calificación debe ser 1-5.'; return; }
 
-                             loadAppointments(); // Recargar listas
-
-                         } catch (error) {
-                             console.error(`Error al cancelar cita ${appointmentId}:`, error);
-                             button.disabled = false; // Habilitar botón de nuevo si falla
-                             button.textContent = 'Cancelar Cita';
-                             // El error global ya lo muestra apiFetch
-                         }
-                     }
-                 }
-                 // Placeholder para Modificar
-                 // else if (event.target.classList.contains('modify-btn')) { ... }
+                const data = { appointmentId: parseInt(appointmentId), rating, comments };
+                submitFeedbackBtn.disabled = true; submitFeedbackBtn.classList.add('saving-indicator'); submitFeedbackBtn.textContent = 'Enviando';
+                try {
+                    const result = await apiFetch('/api/feedback', { method: 'POST', body: JSON.stringify(data) });
+                    console.log('Feedback enviado:', result);
+                    hideFeedbackModal();
+                    alert('¡Gracias por tu opinión!');
+                    loadAppointments();
+                } catch (error) {
+                     if (!feedbackFormFeedbackDiv.textContent) feedbackFormFeedbackDiv.textContent = error.message || 'Error al enviar.';
+                } finally {
+                    submitFeedbackBtn.disabled = false; submitFeedbackBtn.classList.remove('saving-indicator'); submitFeedbackBtn.textContent = 'Enviar Opinión';
+                }
             });
 
             // --- Inicialización ---
             document.getElementById('current-year').textContent = new Date().getFullYear();
-             // Muestra mensaje de bienvenida simulado
-             if (CURRENT_USER_IDENTIFIER) {
-                 welcomeMessageSpan.textContent = `Bienvenido, ${CURRENT_USER_IDENTIFIER}!`;
-                 welcomeMessageSpan.classList.remove('hidden');
-             }
-             loadAppointments(); // Carga inicial
+            if (CURRENT_USER_IDENTIFIER) {
+                welcomeMessageSpan.textContent = `Bienvenido, ${CURRENT_USER_IDENTIFIER}!`; // Muestra ID simulado
+                welcomeMessageSpan.classList.remove('hidden');
+            }
+            loadAppointments(); // Carga inicial de citas
 
         });
     </script>

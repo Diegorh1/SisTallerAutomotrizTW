@@ -646,21 +646,33 @@ app.get('/users', async (req, res) => {
 
 // GET Todas las citas (antes era /api/appointments/all, ahora la ruta principal)
 // También puede manejar filtros opcionales
-app.get('/api/appointments', async (req, res) => { // Removido authenticateToken y isAdmin
-  const { date, client, status } = req.query;
+app.get('/api/appointments', async (req, res) => {
+  const { date, client, status } = req.query; // Obtener filtros
+
+  // Verifica si el pool está listo
+  if (!pool) {
+      console.error("Error: El pool de conexiones no está inicializado al recibir petición GET /api/appointments.");
+      return res.status(500).json({ message: "Error interno del servidor: Conexión no lista." });
+  }
 
   try {
+      // 1. ***** MODIFICACIÓN: Añadir LEFT JOIN y columnas de ServiceFeedback *****
       let query = `
           SELECT
-              A.AppointmentID, A.UserID, A.AppointmentDateTime, A.VehicleDescription, A.ServiceType, A.Status, A.Notes, A.CreatedAt, A.UpdatedAt,
-              U.FullName AS ClientFullName
+              A.AppointmentID, A.UserID, A.AppointmentDateTime, A.VehicleDescription,
+              A.ServiceType, A.Status, A.Notes, A.CreatedAt, A.UpdatedAt,
+              U.FullName AS ClientFullName,
+              -- Columnas de ServiceFeedback (con alias para claridad)
+              SF.FeedbackID, SF.Rating AS FeedbackRating, SF.Comments AS FeedbackComments, SF.SubmittedAt AS FeedbackSubmittedAt
           FROM Appointments A
           LEFT JOIN Users U ON A.UserID = U.ID
-          WHERE 1=1
+          LEFT JOIN ServiceFeedback SF ON A.AppointmentID = SF.AppointmentID -- <<-- UNIR CON FEEDBACK
+          WHERE 1=1 -- Para facilitar añadir filtros
       `;
       const request = pool.request();
       const conditions = [];
 
+      // Aplicar filtros (igual que antes)
       if (date) {
           conditions.push("CONVERT(date, A.AppointmentDateTime) = @FilterDate");
           request.input('FilterDate', sql.Date, date);
@@ -677,26 +689,49 @@ app.get('/api/appointments', async (req, res) => { // Removido authenticateToken
       if (conditions.length > 0) {
           query += " AND " + conditions.join(" AND ");
       }
-
       query += " ORDER BY A.AppointmentDateTime DESC;";
 
-      request.query(query, (err, result) => {
-          if (err) {
-              console.error("Error obteniendo citas:", err);
-              return res.status(500).json({ message: "Error interno del servidor" });
+      // 2. ***** MODIFICACIÓN: Usar async/await para la consulta *****
+      const result = await request.query(query);
+
+      // 3. ***** MODIFICACIÓN: Mapear resultados anidando User y Feedback *****
+      const appointments = result.recordset.map(app => {
+          // Crear el objeto base de la cita
+          const appointmentBase = {
+              AppointmentID: app.AppointmentID,
+              UserID: app.UserID,
+              AppointmentDateTime: app.AppointmentDateTime,
+              VehicleDescription: app.VehicleDescription,
+              ServiceType: app.ServiceType,
+              Status: app.Status,
+              Notes: app.Notes,
+              CreatedAt: app.CreatedAt,
+              UpdatedAt: app.UpdatedAt,
+              User: { FullName: app.ClientFullName || null } // Asegurar que User siempre exista
+          };
+
+          // Añadir el objeto Feedback solo si se encontró un FeedbackID
+          if (app.FeedbackID) {
+              appointmentBase.Feedback = {
+                  FeedbackID: app.FeedbackID,
+                  Rating: app.FeedbackRating,
+                  Comments: app.FeedbackComments,
+                  SubmittedAt: app.FeedbackSubmittedAt
+              };
+          } else {
+              appointmentBase.Feedback = null; // Indicar explícitamente que no hay feedback
           }
-          // Mapear para anidar info del usuario
-           const appointments = result.recordset.map(app => ({
-               ...app,
-               User: { FullName: app.ClientFullName }
-           }));
-          res.json(appointments);
+          return appointmentBase;
       });
+
+      res.json(appointments); // Enviar la respuesta con la estructura modificada
+
   } catch (error) {
-      console.error("Error en GET /api/appointments:", error);
-      res.status(500).json({ message: "Error interno del servidor" });
+      console.error("Error en GET /api/appointments:", error.message);
+      res.status(500).json({ message: "Error interno del servidor al obtener citas." });
   }
 });
+
 
 
 // POST Crear nueva cita (Admin - requiere identificar cliente)
@@ -923,6 +958,38 @@ app.get('/api/users', async (req, res) => { // Removido authenticateToken y isAd
       res.status(500).json({ message: "Error interno del servidor" });
   }
 });
+
+app.post('/api/feedback', async (req, res) => {
+  const { appointmentId, rating, comments } = req.body;
+
+  if (!pool) { /* ... */ }
+  if (!appointmentId || (rating == null && !comments)) { /* ... */ }
+  if (rating != null && (typeof rating !== 'number' || rating < 1 || rating > 5)) { /* ... */ }
+
+  try {
+      // Verificar cita (opcional)
+      /* ... */
+      // Insertar feedback
+      const insertRequest = pool.request();
+      insertRequest.input('AppointmentID', sql.Int, appointmentId);
+      insertRequest.input('Rating', sql.Int, rating);
+      insertRequest.input('Comments', sql.NVarChar, comments);
+      const insertQuery = `
+          INSERT INTO ServiceFeedback (AppointmentID, Rating, Comments)
+          OUTPUT INSERTED.*
+          VALUES (@AppointmentID, @Rating, @Comments);
+      `;
+      const insertResult = await insertRequest.query(insertQuery);
+      res.status(201).json(insertResult.recordset[0]);
+  } catch (error) {
+      if (error.number === 2627 || error.message.toLowerCase().includes('unique constraint')) {
+          /* ... (manejo error duplicado) ... */
+      }
+      console.error("Error en POST /api/feedback:", error.message);
+      res.status(500).json({ message: "Error interno al guardar la opinión." });
+  }
+});
+
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////

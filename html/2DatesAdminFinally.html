@@ -6,9 +6,13 @@
     <title>Panel Admin - AutoCare Rodriguez</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
+        /* Estilos para indicador de carga y estrellas */
         .saving-indicator::after { content: '...'; display: inline-block; animation: dots 1s steps(5, end) infinite; }
         @keyframes dots { 0%, 20% { content: '.'; } 40% { content: '..'; } 60%, 100% { content: '...'; } }
         button:disabled { opacity: 0.6; cursor: not-allowed; }
+        /* Estilo para estrellas en tabla admin */
+        .feedback-rating .text-yellow-500 { color: #f59e0b; }
+        .feedback-rating .text-gray-300 { color: #d1d5db; }
     </style>
 </head>
 <body class="bg-gray-50">
@@ -18,8 +22,7 @@
             <h1 class="text-2xl font-bold">Panel Admin - AutoCare Rodriguez</h1>
             <div class="flex items-center space-x-4">
                 <a href="#"><button class="px-4 py-2 rounded hover:bg-gray-700">Clientes</button></a>
-                <a href="admin.html"><button class="px-4 py-2 rounded bg-gray-700">Citas</button></a>
-                <a href="#"><button class="px-4 py-2 rounded hover:bg-gray-700">Inventario</button></a>
+                <a href="admin.html"><button class="px-4 py-2 rounded bg-gray-700">Citas</button></a> <a href="#"><button class="px-4 py-2 rounded hover:bg-gray-700">Inventario</button></a>
                 <a href="#"><button class="px-4 py-2 rounded hover:bg-gray-700">Facturación</button></a>
                 <a href="#"><button class="px-4 py-2 rounded hover:bg-gray-700">Usuarios Admin</button></a>
                 </div>
@@ -62,7 +65,7 @@
 
         <div class="bg-white rounded-lg shadow p-6">
             <h3 class="text-xl font-semibold mb-4">Listado de Citas</h3>
-             <div id="api-error-message" class="mb-4 p-3 text-red-700 bg-red-100 border border-red-400 rounded hidden"></div>
+            <div id="api-error-message" class="mb-4 p-3 text-red-700 bg-red-100 border border-red-400 rounded hidden"></div>
             <div class="overflow-x-auto">
                 <table class="w-full">
                     <thead class="bg-gray-50">
@@ -72,23 +75,22 @@
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vehículo</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Servicio</th>
                             <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Opinión Cliente</th> <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acciones</th>
                         </tr>
                     </thead>
                     <tbody id="appointments-table-body" class="bg-white divide-y divide-gray-200">
                         <tr id="loading-row">
-                            <td colspan="6" class="text-center py-4 text-gray-500">Cargando citas...</td>
-                        </tr>
+                            <td colspan="7" class="text-center py-4 text-gray-500">Cargando citas...</td> </tr>
                         </tbody>
                 </table>
             </div>
-             <div id="no-results" class="text-center py-4 text-gray-500 hidden">No se encontraron citas con los filtros aplicados.</div>
+            <div id="no-results" class="text-center py-4 text-gray-500 hidden">No se encontraron citas con los filtros aplicados.</div>
         </div>
     </div>
 
     <div id="adminScheduleModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto p-4">
-         <div class="bg-white rounded-lg p-8 max-w-2xl w-full m-auto">
-             <div class="flex justify-between items-center mb-6">
+        <div class="bg-white rounded-lg p-8 max-w-2xl w-full m-auto">
+            <div class="flex justify-between items-center mb-6">
                 <h3 id="admin-modal-title" class="text-2xl font-semibold">Agregar Nueva Cita</h3>
                 <button id="close-admin-schedule-modal-btn" class="text-gray-500 hover:text-gray-700">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
@@ -96,7 +98,8 @@
             </div>
             <form id="admin-schedule-form" class="space-y-6">
                 <input type="hidden" id="a-appointment-id" name="appointmentId">
-                <input type="hidden" id="a-user-id" name="userId"> <div>
+                <input type="hidden" id="a-user-id" name="userId">
+                <div>
                     <label for="a-cliente" class="block text-sm font-medium text-gray-700 mb-1">Cliente (Nombre o Email)</label>
                     <input type="text" id="a-cliente" name="clientIdentifier" required class="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500" placeholder="Nombre completo o Email del cliente...">
                 </div>
@@ -158,7 +161,7 @@
      <script>
         document.addEventListener('DOMContentLoaded', () => {
             // --- Configuración ---
-            const API_BASE_URL = 'http://localhost:3000'; // Ajusta si tu API corre en otro puerto/host
+            const API_BASE_URL = 'http://localhost:3000'; // Ajusta si es necesario
 
             // --- Elements ---
             const adminScheduleModal = document.getElementById('adminScheduleModal');
@@ -176,79 +179,50 @@
             const clearFilterBtn = document.getElementById('clear-filter-btn');
             const adminModalTitle = document.getElementById('admin-modal-title');
             const appointmentIdInput = document.getElementById('a-appointment-id');
-            const userIdInput = document.getElementById('a-user-id'); // Input oculto para UserID en edición
+            const userIdInput = document.getElementById('a-user-id');
             const apiErrorMessageDiv = document.getElementById('api-error-message');
-
 
             // --- Funciones Auxiliares ---
             function showApiError(message) {
                 apiErrorMessageDiv.textContent = `Error API: ${message}`;
                 apiErrorMessageDiv.classList.remove('hidden');
+                setTimeout(() => hideApiError(), 5000);
             }
             function hideApiError() {
                 apiErrorMessageDiv.classList.add('hidden');
                 apiErrorMessageDiv.textContent = '';
             }
-            // Función genérica para fetch (simplifica añadir headers, manejar errores)
+             // Función genérica para fetch (sin autenticación)
             async function apiFetch(endpoint, options = {}) {
-                 // No se añade el header Authorization
-                options.headers = {
-                    'Content-Type': 'application/json',
-                    ...options.headers, // Permite sobreescribir Content-Type si es necesario
-                };
-
+                options.headers = { 'Content-Type': 'application/json', ...options.headers };
                 try {
                     const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
-                    hideApiError(); // Ocultar error previo si la nueva llamada funciona inicialmente
-
+                    hideApiError();
                     if (!response.ok) {
-                        let errorData;
-                        try {
-                            errorData = await response.json(); // Intenta obtener mensaje de error de la API
-                        } catch (e) {
-                            errorData = { message: response.statusText }; // Usa texto de estado si no hay JSON
-                        }
-                        console.error(`API Error ${response.status}:`, errorData);
-                        showApiError(errorData.message || `Error ${response.status}`);
-                        throw new Error(errorData.message || `Error ${response.status}`);
+                        let errorData = { message: `Error HTTP ${response.status}: ${response.statusText}` };
+                        try { errorData.message = (await response.json()).message || errorData.message; } catch (e) {}
+                        throw new Error(errorData.message);
                     }
-
-                    // Si la respuesta es 204 No Content (ej: DELETE exitoso sin cuerpo)
-                    if (response.status === 204) {
-                        return null; // O un objeto indicando éxito, ej: { success: true }
-                    }
-
-                    return await response.json(); // Parsea respuesta JSON normal
+                    return response.status === 204 ? null : await response.json();
                 } catch (error) {
-                    // Errores de red u otros errores que no son respuestas HTTP
-                    if (!apiErrorMessageDiv.textContent) { // No sobrescribir si ya hay un error HTTP
-                       console.error('Fetch Error:', error);
-                       showApiError(error.message || 'Error de conexión o de red.');
-                    }
-                    throw error; // Propagar el error para manejo adicional si es necesario
+                    console.error('API Fetch Error:', error);
+                    showApiError(error.message || 'Error de conexión.');
+                    throw error;
                 }
             }
 
             // --- Modal Handling ---
             const showAdminModal = (isEditMode = false, appointmentData = null) => {
-                adminScheduleForm.reset();
-                appointmentIdInput.value = '';
-                userIdInput.value = ''; // Limpiar UserID oculto
-                adminFeedbackDiv.textContent = '';
-                hideApiError(); // Ocultar errores de API al abrir modal
-
-                 // Deshabilitar campo cliente en modo edición
-                 document.getElementById('a-cliente').disabled = isEditMode;
+                adminScheduleForm.reset(); appointmentIdInput.value = ''; userIdInput.value = '';
+                adminFeedbackDiv.textContent = ''; hideApiError();
+                document.getElementById('a-cliente').disabled = isEditMode;
 
                 if (isEditMode && appointmentData) {
                     adminModalTitle.textContent = 'Editar Cita';
                     appointmentIdInput.value = appointmentData.AppointmentID;
-                    userIdInput.value = appointmentData.UserID; // Guardar UserID
-
-                    // Poblar formulario
-                    document.getElementById('a-cliente').value = appointmentData.User?.FullName || `Usuario ID: ${appointmentData.UserID}`; // Mostrar nombre o ID
+                    userIdInput.value = appointmentData.UserID;
+                    document.getElementById('a-cliente').value = appointmentData.User?.FullName || `Usuario ID: ${appointmentData.UserID}`;
                     const dateTime = new Date(appointmentData.AppointmentDateTime);
-                    // Manejo de zona horaria local para inputs date/time
                     const localDate = new Date(dateTime.getTime() - dateTime.getTimezoneOffset() * 60000);
                     document.getElementById('a-fecha').value = localDate.toISOString().split('T')[0];
                     document.getElementById('a-hora').value = localDate.toISOString().split('T')[1].substring(0, 5);
@@ -258,15 +232,11 @@
                     document.getElementById('a-notas').value = appointmentData.Notes || '';
                 } else {
                     adminModalTitle.textContent = 'Agregar Nueva Cita';
-                     document.getElementById('a-cliente').disabled = false; // Habilitar campo cliente
+                    document.getElementById('a-cliente').disabled = false;
                 }
                 adminScheduleModal.classList.remove('hidden');
             };
-            const hideAdminModal = () => {
-                 adminScheduleModal.classList.add('hidden');
-                 adminFeedbackDiv.textContent = ''; // Limpiar feedback del form al cerrar
-            }
-
+            const hideAdminModal = () => { adminScheduleModal.classList.add('hidden'); adminFeedbackDiv.textContent = ''; }
             openAdminModalBtn.addEventListener('click', () => showAdminModal(false));
             closeAdminModalBtn.addEventListener('click', hideAdminModal);
             cancelAdminModalBtn.addEventListener('click', hideAdminModal);
@@ -287,267 +257,175 @@
             }
 
             async function loadAllAppointments() {
-                loadingRow.style.display = '';
-                noResultsDiv.classList.add('hidden');
-                appointmentsTableBody.innerHTML = ''; // Limpiar tabla antes de añadir fila de carga
-                appointmentsTableBody.appendChild(loadingRow);
-                hideApiError(); // Ocultar errores previos
-
+                loadingRow.style.display = ''; noResultsDiv.classList.add('hidden');
+                appointmentsTableBody.innerHTML = ''; appointmentsTableBody.appendChild(loadingRow);
+                hideApiError();
                 const filters = getFilterParams();
-                const endpoint = `/api/appointments?${filters}`; // Usa la ruta base ahora
-
+                const endpoint = `/api/appointments?${filters}`; // Usa la ruta base
                 console.log(`Cargando citas desde: ${endpoint}`);
-
                 try {
-                    const appointments = await apiFetch(endpoint); // Usa la función apiFetch
+                    const appointments = await apiFetch(endpoint);
                     loadingRow.style.display = 'none';
-
                     if (appointments && appointments.length > 0) {
-                        appointmentsTableBody.innerHTML = ''; // Limpiar completamente antes de añadir filas reales
+                        appointmentsTableBody.innerHTML = '';
                         appointments.forEach(renderAppointmentRow);
                     } else {
                         appointmentsTableBody.innerHTML = '';
                         noResultsDiv.classList.remove('hidden');
                     }
                 } catch (error) {
-                    // El error ya se muestra por apiFetch
-                    loadingRow.style.display = 'none';
-                    appointmentsTableBody.innerHTML = ''; // Limpiar por si acaso
-                    // No necesitamos añadir una fila de error aquí, ya se muestra arriba
+                    loadingRow.style.display = 'none'; appointmentsTableBody.innerHTML = '';
+                    // Error global ya se muestra por apiFetch
                 }
             }
 
-            function renderAppointmentRow(appointment) {
-                // Formatear fecha/hora localmente
-                const localDateTime = new Date(appointment.AppointmentDateTime).toLocaleString('es-MX', {
-                    year: 'numeric', month: '2-digit', day: '2-digit',
-                    hour: '2-digit', minute: '2-digit', hour12: true
-                });
+            // **** FUNCIÓN DE RENDERIZADO MODIFICADA ****
+             function renderAppointmentRow(appointment) {
+                 const localDateTime = new Date(appointment.AppointmentDateTime).toLocaleString('es-MX', {
+                     year: 'numeric', month: '2-digit', day: '2-digit',
+                     hour: '2-digit', minute: '2-digit', hour12: true
+                 });
 
-                 const rowHTML = `
-                    <tr class="hover:bg-gray-50 appointment-row" data-appointment-id="${appointment.AppointmentID}" data-user-id="${appointment.UserID}" data-client-name="${appointment.User?.FullName || ''}" data-vehicle="${appointment.VehicleDescription}" data-service="${appointment.ServiceType}" data-datetime="${appointment.AppointmentDateTime}" data-notes="${appointment.Notes || ''}" data-status="${appointment.Status}">
-                        <td class="px-6 py-4 whitespace-nowrap appointment-datetime">${localDateTime}</td>
-                        <td class="px-6 py-4 whitespace-nowrap appointment-client">${appointment.User?.FullName || `Usuario ID: ${appointment.UserID}`}</td>
-                        <td class="px-6 py-4 whitespace-nowrap appointment-vehicle">${appointment.VehicleDescription}</td>
-                        <td class="px-6 py-4 whitespace-nowrap appointment-service">${appointment.ServiceType}</td>
-                        <td class="px-6 py-4 whitespace-nowrap">
-                            <select class="status-select px-2 py-1 border rounded text-sm focus:ring-indigo-500 focus:border-indigo-500" data-original-status="${appointment.Status}">
-                                <option value="pending" ${appointment.Status === 'pending' ? 'selected' : ''}>Pendiente</option>
-                                <option value="in_progress" ${appointment.Status === 'in_progress' ? 'selected' : ''}>En Progreso</option>
-                                <option value="completed" ${appointment.Status === 'completed' ? 'selected' : ''}>Completado</option>
-                                <option value="cancelled" ${appointment.Status === 'cancelled' ? 'selected' : ''}>Cancelado</option>
-                            </select>
-                            <button class="update-status-btn ml-2 text-xs text-green-600 hover:text-green-800" style="display: none;">Guardar</button>
-                        </td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                            <button class="text-indigo-600 hover:text-indigo-900 mr-3 edit-btn">Editar</button>
-                            <button class="text-red-600 hover:text-red-900 delete-btn">Eliminar</button>
-                        </td>
-                    </tr>`;
-                appointmentsTableBody.insertAdjacentHTML('beforeend', rowHTML);
-            }
-
-            // Listener filtros
-            filterBtn.addEventListener('click', loadAllAppointments);
-            clearFilterBtn.addEventListener('click', () => {
-                filterForm.reset();
-                loadAllAppointments();
-            });
-
-             // Listener formulario agregar/editar cita
-             submitAdminScheduleBtn.addEventListener('click', async () => {
-                adminFeedbackDiv.textContent = '';
-                hideApiError();
-                const formData = new FormData(adminScheduleForm);
-                const appointmentId = formData.get('appointmentId');
-                const isEditMode = !!appointmentId;
-
-                // Asegurarse que la fecha y hora se combinen correctamente
-                 const dateValue = formData.get('appointmentDate');
-                 const timeValue = formData.get('appointmentTime');
-                 let combinedDateTime = null;
-                 if(dateValue && timeValue){
-                     // Crear fecha en UTC para evitar problemas de zona horaria al enviar a la API
-                     // La API debería interpretarla correctamente
-                      const dateObj = new Date(dateValue + 'T' + timeValue + ':00');
-                      // Validar si la fecha es válida antes de convertir
-                      if (!isNaN(dateObj.getTime())) {
-                         combinedDateTime = dateObj.toISOString(); // Enviar en formato ISO 8601 (UTC por defecto)
-                      }
+                 // --- Crear HTML para la sección de Feedback ---
+                 let feedbackHTML = '<span class="text-gray-400 text-xs">N/A</span>'; // Default
+                 if (appointment.Feedback) {
+                     const starsHTML = appointment.Feedback.Rating
+                         ? `<span class="feedback-rating text-xs"><span class="text-yellow-500">${'★'.repeat(appointment.Feedback.Rating)}</span><span class="text-gray-300">${'☆'.repeat(5 - appointment.Feedback.Rating)}</span></span>`
+                         : '<span class="text-gray-400 text-xs">Sin Rating</span>';
+                     const commentsHTML = appointment.Feedback.Comments
+                         ? `<p class="text-xs text-gray-600 mt-1 italic truncate" title="${appointment.Feedback.Comments.replace(/"/g, '&quot;')}">"${appointment.Feedback.Comments}"</p>` // Escapar comillas para title
+                         : '';
+                     feedbackHTML = `${starsHTML}${commentsHTML}`;
+                 } else if (appointment.Status === 'completed') {
+                    feedbackHTML = '<span class="text-gray-400 text-xs">Pendiente</span>'; // Aún no opina
                  }
 
+                 // --- Construir la fila completa ---
+                 const rowHTML = `
+                     <tr class="hover:bg-gray-50 appointment-row"
+                         data-appointment-id="${appointment.AppointmentID}"
+                         data-user-id="${appointment.UserID}"
+                         data-client-name="${appointment.User?.FullName || ''}"
+                         data-vehicle="${appointment.VehicleDescription}"
+                         data-service="${appointment.ServiceType}"
+                         data-datetime="${appointment.AppointmentDateTime}"
+                         data-notes="${appointment.Notes || ''}"
+                         data-status="${appointment.Status}">
+
+                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${localDateTime}</td>
+                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${appointment.User?.FullName || `Usuario ID: ${appointment.UserID}`}</td>
+                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${appointment.VehicleDescription}</td>
+                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${appointment.ServiceType}</td>
+                         <td class="px-6 py-4 whitespace-nowrap">
+                             <select class="status-select px-2 py-1 border rounded text-sm focus:ring-indigo-500 focus:border-indigo-500" data-original-status="${appointment.Status}">
+                                 <option value="pending" ${appointment.Status === 'pending' ? 'selected' : ''}>Pendiente</option>
+                                 <option value="in_progress" ${appointment.Status === 'in_progress' ? 'selected' : ''}>En Progreso</option>
+                                 <option value="completed" ${appointment.Status === 'completed' ? 'selected' : ''}>Completado</option>
+                                 <option value="cancelled" ${appointment.Status === 'cancelled' ? 'selected' : ''}>Cancelado</option>
+                             </select>
+                             <button class="update-status-btn ml-2 text-xs text-green-600 hover:text-green-800" style="display: none;">Guardar</button>
+                         </td>
+                         <td class="px-6 py-4 whitespace-normal text-xs text-gray-500">
+                            ${feedbackHTML}
+                         </td>
+                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                             <button class="text-indigo-600 hover:text-indigo-900 mr-3 edit-btn">Editar</button>
+                             <button class="text-red-600 hover:text-red-900 delete-btn">Eliminar</button>
+                         </td>
+                     </tr>`;
+                 appointmentsTableBody.insertAdjacentHTML('beforeend', rowHTML);
+             }
+
+
+            // --- Listeners ---
+            filterBtn.addEventListener('click', loadAllAppointments);
+            clearFilterBtn.addEventListener('click', () => { filterForm.reset(); loadAllAppointments(); });
+
+            // Listener formulario agregar/editar cita
+            submitAdminScheduleBtn.addEventListener('click', async () => {
+                adminFeedbackDiv.textContent = ''; hideApiError();
+                const formData = new FormData(adminScheduleForm);
+                const appointmentId = formData.get('appointmentId'); const isEditMode = !!appointmentId;
+                const dateValue = formData.get('appointmentDate'); const timeValue = formData.get('appointmentTime');
+                let combinedDateTime = null;
+                if(dateValue && timeValue){ const dateObj = new Date(dateValue + 'T' + timeValue + ':00'); if (!isNaN(dateObj.getTime())) combinedDateTime = dateObj.toISOString(); }
 
                 const data = {
-                    // En modo edición, no enviamos clientIdentifier, el ID de usuario ya está asociado
-                    // Enviamos clientIdentifier solo si NO estamos en modo edición
                     clientIdentifier: isEditMode ? undefined : formData.get('clientIdentifier'),
-                    appointmentDateTime: combinedDateTime,
-                    vehicleDescription: formData.get('vehicleDescription'),
-                    serviceType: formData.get('serviceType'),
-                    status: formData.get('status'),
-                    notes: formData.get('notes') || null
+                    appointmentDateTime: combinedDateTime, vehicleDescription: formData.get('vehicleDescription'),
+                    serviceType: formData.get('serviceType'), status: formData.get('status'), notes: formData.get('notes') || null
                 };
-
-                 // Remover clientIdentifier si es undefined (para PUT)
-                 if(data.clientIdentifier === undefined) delete data.clientIdentifier;
-
-
-                 // Validación básica frontal
-                 if ((!isEditMode && !data.clientIdentifier) || !data.appointmentDateTime || !data.vehicleDescription || !data.serviceType || !data.status) {
-                     adminFeedbackDiv.textContent = 'Por favor, complete todos los campos requeridos (Cliente*, Fecha, Hora, Vehículo, Servicio, Estado). *Cliente requerido solo al crear.';
-                     return;
-                 }
-                 if (!combinedDateTime) {
-                     adminFeedbackDiv.textContent = 'Fecha u hora inválida.';
-                     return;
-                 }
-
+                if(data.clientIdentifier === undefined) delete data.clientIdentifier;
+                if ((!isEditMode && !data.clientIdentifier) || !data.appointmentDateTime || !data.vehicleDescription || !data.serviceType || !data.status) {
+                    adminFeedbackDiv.textContent = 'Campos requeridos: Cliente*, Fecha, Hora, Vehículo, Servicio, Estado. (*Solo al crear).'; return;
+                } if (!combinedDateTime) { adminFeedbackDiv.textContent = 'Fecha u hora inválida.'; return; }
 
                 const endpoint = isEditMode ? `/api/appointments/${appointmentId}` : '/api/appointments';
                 const method = isEditMode ? 'PUT' : 'POST';
-
-                console.log(`Enviando datos a ${method} ${endpoint}:`, JSON.stringify(data));
-                submitAdminScheduleBtn.disabled = true;
-                submitAdminScheduleBtn.classList.add('saving-indicator');
-                submitAdminScheduleBtn.textContent = 'Guardando';
-
+                submitAdminScheduleBtn.disabled = true; submitAdminScheduleBtn.classList.add('saving-indicator'); submitAdminScheduleBtn.textContent = 'Guardando';
                 try {
-                    const result = await apiFetch(endpoint, {
-                        method: method,
-                        body: JSON.stringify(data)
-                    });
+                    const result = await apiFetch(endpoint, { method: method, body: JSON.stringify(data) });
                     console.log(`Cita ${isEditMode ? 'actualizada' : 'creada'}:`, result);
-
-                    hideAdminModal();
-                    loadAllAppointments(); // Recargar tabla
-                    alert(`¡Cita ${isEditMode ? 'actualizada' : 'creada'} con éxito!`);
-
+                    hideAdminModal(); loadAllAppointments(); alert(`¡Cita ${isEditMode ? 'actualizada' : 'creada'} con éxito!`);
                 } catch (error) {
-                    // El error ya se muestra por apiFetch en apiErrorMessageDiv o adminFeedbackDiv
-                     if (!adminFeedbackDiv.textContent && apiErrorMessageDiv.textContent) {
-                         adminFeedbackDiv.textContent = apiErrorMessageDiv.textContent; // Mostrar error específico del form si no hay otro
-                     } else if (!adminFeedbackDiv.textContent) {
-                         adminFeedbackDiv.textContent = `Error: ${error.message || 'Error desconocido'}`;
-                     }
+                    if (!adminFeedbackDiv.textContent) adminFeedbackDiv.textContent = error.message || 'Error desconocido.';
                 } finally {
-                     submitAdminScheduleBtn.disabled = false;
-                     submitAdminScheduleBtn.classList.remove('saving-indicator');
-                     submitAdminScheduleBtn.textContent = 'Guardar Cita';
+                    submitAdminScheduleBtn.disabled = false; submitAdminScheduleBtn.classList.remove('saving-indicator'); submitAdminScheduleBtn.textContent = 'Guardar Cita';
                 }
-             });
+            });
 
-
-            // Listeners para acciones en la tabla
+            // Listeners para acciones en la tabla (Editar, Eliminar, Guardar Estado)
             appointmentsTableBody.addEventListener('click', async (event) => {
-                const target = event.target;
-                const row = target.closest('.appointment-row');
-                if (!row) return;
-
+                const target = event.target; const row = target.closest('.appointment-row'); if (!row) return;
                 const appointmentId = row.dataset.appointmentId;
 
-                // --- Editar ---
+                // Editar
                 if (target.classList.contains('edit-btn')) {
-                    console.log(`Editar cita ID: ${appointmentId}`);
-                    // Reconstruir datos desde atributos data-* de la fila
                     const appointmentData = {
-                        AppointmentID: appointmentId,
-                        UserID: row.dataset.userId,
-                        User: { FullName: row.dataset.clientName },
-                        AppointmentDateTime: row.dataset.datetime, // Usar el ISO string original
-                        VehicleDescription: row.dataset.vehicle,
-                        ServiceType: row.dataset.service,
-                        Status: row.dataset.status,
-                        Notes: row.dataset.notes,
+                        AppointmentID: appointmentId, UserID: row.dataset.userId, User: { FullName: row.dataset.clientName },
+                        AppointmentDateTime: row.dataset.datetime, VehicleDescription: row.dataset.vehicle,
+                        ServiceType: row.dataset.service, Status: row.dataset.status, Notes: row.dataset.notes,
                     };
-                     // Validar que los datos necesarios existen
-                    if(appointmentData.AppointmentDateTime && appointmentData.UserID){
-                       showAdminModal(true, appointmentData);
-                    } else {
-                         console.error("Faltan datos en la fila para editar:", row.dataset);
-                         alert("Error: No se pudieron cargar los datos completos para editar.");
+                    if(appointmentData.AppointmentDateTime && appointmentData.UserID){ showAdminModal(true, appointmentData); }
+                    else { alert("Error al cargar datos para editar."); }
+                }
+                // Eliminar
+                else if (target.classList.contains('delete-btn')) {
+                    if (!confirm(`¿Eliminar cita ID ${appointmentId}?`)) return;
+                    target.disabled = true; target.textContent = 'Eliminando...'; hideApiError();
+                    try {
+                        await apiFetch(`/api/appointments/${appointmentId}`, { method: 'DELETE' });
+                        console.log(`Cita ${appointmentId} eliminada.`); row.remove(); alert(`Cita ID ${appointmentId} eliminada.`);
+                        if (appointmentsTableBody.children.length === 0 || (appointmentsTableBody.children.length === 1 && appointmentsTableBody.firstChild.id === 'loading-row')) { noResultsDiv.classList.remove('hidden'); }
+                    } catch (error) { target.disabled = false; target.textContent = 'Eliminar'; }
+                }
+                // Guardar Estado
+                else if (target.classList.contains('update-status-btn')) {
+                    const selectElement = row.querySelector('.status-select'); const newStatus = selectElement.value;
+                    target.disabled = true; target.classList.add('saving-indicator'); target.textContent = 'Guardando'; hideApiError();
+                    try {
+                        const result = await apiFetch(`/api/appointments/${appointmentId}/status`, { method: 'PATCH', body: JSON.stringify({ status: newStatus }) });
+                        selectElement.dataset.originalStatus = newStatus; row.dataset.status = newStatus; target.style.display = 'none';
+                    } catch (error) {
+                        selectElement.value = selectElement.dataset.originalStatus; target.disabled = false; target.style.display = 'inline';
+                    } finally {
+                         if(target.style.display !== 'none'){ target.textContent = 'Guardar'; target.classList.remove('saving-indicator'); }
                     }
-
-                // --- Eliminar ---
-                } else if (target.classList.contains('delete-btn')) {
-                    console.log(`Eliminar cita ID: ${appointmentId}`);
-                     if (confirm(`¿Está seguro que desea eliminar la cita ID ${appointmentId}?`)) {
-                         target.disabled = true;
-                         target.textContent = 'Eliminando...';
-                         hideApiError();
-
-                         try {
-                             await apiFetch(`/api/appointments/${appointmentId}`, { method: 'DELETE' });
-                             console.log(`Cita ${appointmentId} eliminada.`);
-                             row.remove(); // Eliminar fila visualmente
-                             alert(`Cita ID ${appointmentId} eliminada.`);
-                             if (appointmentsTableBody.children.length === 0 || (appointmentsTableBody.children.length === 1 && appointmentsTableBody.firstChild.id === 'loading-row')) {
-                                noResultsDiv.classList.remove('hidden');
-                            }
-                         } catch (error) {
-                             // El error ya se muestra por apiFetch
-                             target.disabled = false; // Rehabilitar botón si falla
-                             target.textContent = 'Eliminar';
-                         }
-                     }
-
-                 // --- Guardar Estado ---
-                 } else if (target.classList.contains('update-status-btn')) {
-                     const selectElement = row.querySelector('.status-select');
-                     const newStatus = selectElement.value;
-                     console.log(`Actualizar estado cita ID: ${appointmentId} a ${newStatus}`);
-                     target.disabled = true;
-                     target.classList.add('saving-indicator');
-                     target.textContent = 'Guardando'; // El CSS se encarga de los puntos
-                     hideApiError();
-
-                     try {
-                         const result = await apiFetch(`/api/appointments/${appointmentId}/status`, {
-                             method: 'PATCH',
-                             body: JSON.stringify({ status: newStatus })
-                         });
-                         console.log(`Estado actualizado:`, result);
-                         selectElement.dataset.originalStatus = newStatus; // Actualizar estado 'original'
-                         row.dataset.status = newStatus; // Actualizar data-status de la fila
-                         target.style.display = 'none'; // Ocultar botón guardar
-                         target.classList.remove('saving-indicator');
-
-
-                     } catch (error) {
-                         // El error ya se muestra por apiFetch
-                         selectElement.value = selectElement.dataset.originalStatus; // Revertir select
-                          target.disabled = false;
-                          target.classList.remove('saving-indicator');
-                         target.textContent = 'Guardar';
-                         // No ocultar el botón si falló, permitir reintentar
-                         target.style.display = 'inline';
-                     } finally {
-                         // Asegurar que el texto vuelva a la normalidad si no se oculta
-                         if(target.style.display !== 'none'){
-                              target.textContent = 'Guardar';
-                              target.classList.remove('saving-indicator');
-                         }
-                     }
-                 }
+                }
             });
 
             // Listener para cambios en el select de estado
-             appointmentsTableBody.addEventListener('change', (event) => {
-                 if (event.target.classList.contains('status-select')) {
-                     const selectElement = event.target;
-                     const saveButton = selectElement.nextElementSibling;
-                     if (selectElement.value !== selectElement.dataset.originalStatus) {
-                         saveButton.style.display = 'inline';
-                         saveButton.disabled = false;
-                         saveButton.textContent = 'Guardar';
-                         saveButton.classList.remove('saving-indicator');
-                     } else {
-                         saveButton.style.display = 'none';
-                     }
-                 }
-             });
+            appointmentsTableBody.addEventListener('change', (event) => {
+                if (event.target.classList.contains('status-select')) {
+                    const selectElement = event.target; const saveButton = selectElement.nextElementSibling;
+                    if (selectElement.value !== selectElement.dataset.originalStatus) {
+                        saveButton.style.display = 'inline'; saveButton.disabled = false; saveButton.textContent = 'Guardar'; saveButton.classList.remove('saving-indicator');
+                    } else { saveButton.style.display = 'none'; }
+                }
+            });
 
-            // Carga inicial de citas
-            loadAllAppointments();
+            // --- Inicialización ---
+            loadAllAppointments(); // Carga inicial de citas
         });
     </script>
 
