@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="es">
-<head>
+<head>1
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mis Facturas - AutoCare Rodriguez</title>
+    <title>Mis Facturas0000 - AutoCare Rodriguez</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         /* Estilos para indicador de carga */
@@ -107,9 +107,9 @@
          document.addEventListener('DOMContentLoaded', () => {
              // --- Configuración y Simulación Usuario ---
              const API_BASE_URL = 'http://localhost:3000';
-             // ¡¡¡ CAMBIA ESTOS VALORES POR UN USUARIO REAL DE TU BASE DE DATOS !!!
-             const CURRENT_USER_ID = 25; // <<< AJUSTA ESTO
-             const CURRENT_USER_IDENTIFIER = 'juniorh1a@gmail.com'; // <<< AJUSTA ESTO
+             
+             const CURRENT_USER_ID = 25; 
+             const CURRENT_USER_IDENTIFIER = 'juniorh1a@gmail.com'; 
              // ----------------------------1----------
 
              // --- Elementos DOM ---
@@ -152,9 +152,7 @@
                          try { errorData = await response.json(); } catch (e) {}
                          throw new Error(errorData.message || `Error ${response.status}`);
                      }
-                     // Para la descarga, la respuesta no será JSON si es exitosa, sino el archivo.
-                     // Esta función `apiFetchClient` está pensada para respuestas JSON.
-                     // La descarga se manejará directamente con la etiqueta <a>, no con esta función.
+                     
                      if (response.headers.get('Content-Type')?.includes('application/json')) {
                         return response.status === 204 ? null : await response.json();
                      }
