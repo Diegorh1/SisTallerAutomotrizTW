@@ -4,7 +4,7 @@ const sql = require("mssql");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 
-
+const PDFDocument = require('pdfkit');
 const app = express(); // Aquí definimos "app" correctamente
 const PORT = 3000;
 
@@ -1207,117 +1207,541 @@ app.get('/api/invoices/:id', async (req, res) => {
     }
 });
 
+// <<< ADAPTACIÓN: Asegúrate de tener esta línea al inicio de tu archivo Node.js donde defines dependencias
 
-// GET /api/invoices/:id/download - Descargar factura como PDF
+// <<< ADAPTACIÓN: Define la función helper para formatear moneda (puede ir antes de tus rutas o en un archivo de utilidades)
+function formatCurrency(value) {
+    const number = parseFloat(value);
+    if (isNaN(number)) {
+        // Puedes retornar un valor por defecto o lanzar un error si prefieres
+        return '$0.00';
+    }
+    // Usa toLocaleString para un formato de moneda adecuado a la región.
+    // Ajusta 'es-MX' (Español México) y 'MXN' (Peso Mexicano) según necesites.
+    return number.toLocaleString('es-MX', {
+        style: 'currency',
+        currency: 'MXN',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+}
+
+
+
+
+// GET /api/invoices/:id/download - Descargar factura como PDF (Adaptada)
 app.get('/api/invoices/:id/download', async (req, res) => {
     // #swagger.tags = ['Invoices']
     // #swagger.summary = 'Generar y descargar una factura en formato PDF'
     /* #swagger.parameters['id'] = { description: 'ID de la factura', type: 'integer', required: true } */
-    if (!pool) { return res.status(500).send("Error DB."); }
-    const invoiceId = parseInt(req.params.id); if (isNaN(invoiceId)) { return res.status(400).send("ID inválido."); }
-    try {
-        // 1. Obtener datos
-        const request = pool.request(); request.input('InvoiceID', sql.Int, invoiceId);
-        const headerQuery = `SELECT I.*, U.FullName, U.Email, U.PhoneNumber FROM Invoices I LEFT JOIN Users U ON I.UserID = U.ID WHERE I.InvoiceID = @InvoiceID;`;
-        const itemsQuery = `SELECT * FROM InvoiceItems WHERE InvoiceID = @InvoiceID ORDER BY InvoiceItemID;`;
-        const [headerResult, itemsResult] = await Promise.all([ request.query(headerQuery), request.query(itemsQuery) ]);
-        if (!headerResult.recordset?.length) { return res.status(404).send("Factura no encontrada."); }
-        const invoice = headerResult.recordset[0]; const items = itemsResult.recordset || [];
 
-        // 2. Crear PDF y configurar respuesta
+    // Verifica que pool y sql estén disponibles (importante si están en otro módulo)
+    if (!pool || !sql) {
+        console.error("Error Crítico: Pool de DB o módulo SQL no disponible en ruta de descarga.");
+        return res.status(500).send("Error interno del servidor (Configuración DB).");
+     }
+
+    const invoiceId = parseInt(req.params.id);
+    if (isNaN(invoiceId)) {
+        return res.status(400).send("ID de factura inválido.");
+    }
+
+    console.log(`Solicitud de descarga para Factura ID: ${invoiceId}`);
+
+    try {
+        // 1. Obtener datos de la factura y sus items
+        const request = pool.request();
+        request.input('InvoiceID', sql.Int, invoiceId);
+
+        const headerQuery = `
+            SELECT I.*, U.FullName, U.Email, U.PhoneNumber
+            FROM Invoices I
+            LEFT JOIN Users U ON I.UserID = U.ID
+            WHERE I.InvoiceID = @InvoiceID;
+        `;
+        const itemsQuery = `
+            SELECT *
+            FROM InvoiceItems
+            WHERE InvoiceID = @InvoiceID
+            ORDER BY InvoiceItemID;
+        `;
+
+        const [headerResult, itemsResult] = await Promise.all([
+            request.query(headerQuery),
+            request.query(itemsQuery)
+        ]);
+
+        if (!headerResult.recordset?.length) {
+            console.warn(`Factura ID: ${invoiceId} no encontrada para descarga.`);
+            return res.status(404).send("Factura no encontrada.");
+        }
+
+        const invoice = headerResult.recordset[0];
+        const items = itemsResult.recordset || [];
+        console.log(`Datos obtenidos para Factura ID: ${invoiceId}, Cliente: ${invoice.FullName}, Items: ${items.length}`);
+
+        // 2. Crear PDF y configurar respuesta HTTP
         const doc = new PDFDocument({ size: 'A4', margin: 40 });
         const filename = `Factura-INV-${String(invoiceId).padStart(3, '0')}.pdf`;
+
+        // Configura las cabeceras para la descarga
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+        // Pipe (conectar) el stream del PDF directamente a la respuesta HTTP
         doc.pipe(res);
 
-        // --- Contenido del PDF (Ajusta tus datos y diseño) ---
-        const jump = 15; const itemX = 40; const qtyX = 340; const priceX = 400; const totalX = 480; const tableRight = 555; const totalsX = 380;
-        // Emisor (¡CAMBIA ESTO!)
-        doc.fontSize(16).font('Helvetica-Bold').text('AutoCare Rodriguez', { align: 'right' }); // Alineado a la derecha ahora
+        // --- Contenido del PDF ---
+        const jump = 15; // Espacio vertical entre líneas
+        const itemX = 40; // Posición X para descripción
+        const qtyX = 340; // Posición X para cantidad
+        const priceX = 400; // Posición X para precio unitario
+        const totalX = 480; // Posición X para importe del item
+        const tableRight = 555; // Límite derecho de la tabla/líneas
+        const totalsX = 380; // Posición X para etiquetas de totales
+
+        // <<< ADAPTACIÓN: Información del Emisor (Tu Empresa) >>>
+        // Es MEJOR usar variables de entorno o un archivo de configuración
+        // Aquí usamos valores por defecto si no existen las variables de entorno.
+        const companyName = process.env.COMPANY_NAME || 'AutoCare Rodriguez';
+        const companyAddress = process.env.COMPANY_ADDRESS || 'Av. Reforma #100, Col. Centro'; // Ejemplo, ¡CAMBIAR!
+        const companyCityCP = process.env.COMPANY_CITY_CP || 'Cuautla, Morelos CP 62740'; // <<< Usando tu ubicación
+        const companyContact = process.env.COMPANY_CONTACT || 'Tel: 777-213-3925 | Email: rodriguez@autocarerodriguez.com'; // Ejemplo, ¡CAMBIAR!
+        const companyRFC = process.env.COMPANY_RFC || 'RFC: ROHDD54'; // Ejemplo, ¡CAMBIAR! (Opcional pero común en MX)
+
+        // Escribir información del emisor en el PDF
+        doc.fontSize(16).font('Helvetica-Bold').text(companyName, { align: 'right' });
         doc.font('Helvetica').fontSize(10);
-        doc.text('Tu Dirección Aquí', { align: 'right' });
-        doc.text('Ciudad, CP', { align: 'right' });
-        doc.text('Tel: Tu Tel | Email: tu@email.com', { align: 'right' });
-        doc.moveDown(2); // Espacio
-        // Cliente y Factura Info
-        const initialY = doc.y; // Guardar Y actual
+        if (companyRFC) doc.text(companyRFC, { align: 'right' });
+        doc.text(companyAddress, { align: 'right' });
+        doc.text(companyCityCP, { align: 'right' });
+        doc.text(companyContact, { align: 'right' });
+        doc.moveDown(2); // Añadir espacio
+
+        // Información del Cliente y Datos de la Factura
+        const initialY = doc.y; // Guardar Y actual para alinear bloques
         doc.fontSize(11).font('Helvetica-Bold').text('Facturar a:', itemX, initialY);
         doc.font('Helvetica').fontSize(10);
-        doc.text(invoice.FullName || 'N/A', itemX, initialY + jump);
+        doc.text(invoice.FullName || 'Cliente General', itemX, initialY + jump);
         if (invoice.Email) doc.text(invoice.Email, itemX, initialY + jump * 2);
         if (invoice.PhoneNumber) doc.text(invoice.PhoneNumber, itemX, initialY + jump * 3);
+        // Considera añadir RFC del cliente si lo tienes: doc.text(`RFC: ${invoice.ClientRFC || 'XAXX010101000'}`, itemX, initialY + jump * 4);
+
+        // Lado derecho: Datos de la factura
         doc.fontSize(11).font('Helvetica-Bold').text(`Factura #: INV-${String(invoiceId).padStart(3, '0')}`, 350, initialY);
         doc.font('Helvetica').fontSize(10);
-        doc.text(`Fecha Emisión: ${new Date(invoice.InvoiceDate).toLocaleDateString('es-MX')}`, 350, initialY + jump);
-        doc.text(`Vencimiento: ${invoice.DueDate ? new Date(invoice.DueDate).toLocaleDateString('es-MX') : 'N/A'}`, 350, initialY + jump * 2);
+        doc.text(`Fecha Emisión: ${new Date(invoice.InvoiceDate).toLocaleDateString('es-MX', { dateStyle: 'short' })}`, 350, initialY + jump);
+        doc.text(`Vencimiento: ${invoice.DueDate ? new Date(invoice.DueDate).toLocaleDateString('es-MX', { dateStyle: 'short' }) : 'N/A'}`, 350, initialY + jump * 2);
         doc.font('Helvetica-Bold').text(`Estado: ${invoice.Status?.toUpperCase() || 'N/A'}`, 350, initialY + jump * 3);
-        doc.y = initialY + jump * 4 + 10; // Mover Y debajo de lo más largo
+        // Si tienes método de pago guardado, podrías añadirlo
+        // doc.text(`Método Pago: ${invoice.PaymentMethod || 'N/A'}`, 350, initialY + jump * 4);
+
+        doc.y = initialY + jump * 4 + 15; // Mover cursor Y debajo del bloque más largo + espacio
 
         // --- Tabla de Items ---
-        const tableTop = doc.y; let currentY = tableTop + jump; // Ajuste inicial Y
-        // Encabezados Tabla
-        doc.font('Helvetica-Bold').fontSize(10);
-        doc.text('Descripción', itemX, tableTop, { width: qtyX - itemX - 10 }); // Ancho ajustado
-        doc.text('Cant.', qtyX, tableTop, { width: 50, align: 'right' });
-        doc.text('P. Unit.', priceX, tableTop, { width: 70, align: 'right' });
-        doc.text('Importe', totalX, tableTop, { width: 70, align: 'right' });
-        doc.moveTo(itemX, tableTop + jump * 0.8).lineTo(tableRight, tableTop + jump * 0.8).lineWidth(0.5).strokeColor("#aaaaaa").stroke(); // Línea bajo encabezados
-        // Items
+        const tableTop = doc.y;
+        let currentY = tableTop; // Y actual para dibujar items
+
+        // Función interna para dibujar encabezados (útil para saltos de página)
+        const drawTableHeader = (yPos) => {
+            doc.font('Helvetica-Bold').fontSize(10);
+            doc.text('Descripción', itemX, yPos, { width: qtyX - itemX - 10 });
+            doc.text('Cant.', qtyX, yPos, { width: 50, align: 'right' });
+            doc.text('P. Unit.', priceX, yPos, { width: 70, align: 'right' });
+            doc.text('Importe', totalX, yPos, { width: 70, align: 'right' });
+            doc.moveTo(itemX, yPos + jump * 0.8).lineTo(tableRight, yPos + jump * 0.8).lineWidth(0.5).strokeColor("#aaaaaa").stroke();
+            return yPos + jump; // Devuelve la nueva posición Y
+        };
+
+        currentY = drawTableHeader(currentY); // Dibuja encabezados iniciales
+
+        // Dibujar cada item
         doc.font('Helvetica').fontSize(9);
         items.forEach(item => {
-             const itemTotal = (item.Quantity || 1) * (item.UnitPrice || 0);
-             const descHeight = doc.heightOfString(item.Description || '', { width: qtyX - itemX - 10 }); // Calcular altura texto
-             const requiredHeight = Math.max(jump * 0.8, descHeight + 5); // Altura mínima o altura del texto
-             // Salto de página si no cabe
-             if (currentY + requiredHeight > doc.page.height - doc.page.margins.bottom - 50) { // -50 para espacio de totales
-                 doc.addPage();
-                 currentY = doc.page.margins.top; // Reiniciar Y arriba
-                 // Opcional: Re-dibujar encabezados de tabla en la nueva página
-                 doc.font('Helvetica-Bold').fontSize(10).text('Descripción', itemX, currentY).text('Cant.', qtyX, currentY, { width: 50, align: 'right' }).text('P. Unit.', priceX, currentY, { width: 70, align: 'right' }).text('Importe', totalX, currentY, { width: 70, align: 'right' });
-                 currentY += jump;
-                 doc.moveTo(itemX, currentY).lineTo(tableRight, currentY).lineWidth(0.5).strokeColor("#aaaaaa").stroke();
-                 currentY += 5;
-             }
-             doc.text(item.Description || '', itemX, currentY, { width: qtyX - itemX - 10 });
-             doc.text((item.Quantity || 1).toString(), qtyX, currentY, { width: 50, align: 'right' });
-             doc.text(`$${(item.UnitPrice || 0).toFixed(2)}`, priceX, currentY, { width: 70, align: 'right' });
-             doc.text(`$${itemTotal.toFixed(2)}`, totalX, currentY, { width: 70, align: 'right' });
-             currentY += requiredHeight; // Incrementar Y basado en altura real
-        });
-        doc.moveTo(itemX, currentY).lineTo(tableRight, currentY).lineWidth(0.5).strokeColor("#aaaaaa").stroke(); // Línea final tabla
+            const itemTotal = (item.Quantity || 1) * (item.UnitPrice || 0);
+            // Calcula la altura necesaria para la descripción (maneja textos largos)
+            const descHeight = doc.heightOfString(item.Description || 'N/A', { width: qtyX - itemX - 10, align: 'left' });
+            const requiredHeight = Math.max(jump * 0.8, descHeight + 5); // Altura mínima o la del texto + padding
 
-        // --- Totales ---
-         // Asegurar espacio para totales
-        if (currentY > doc.page.height - doc.page.margins.bottom - 60) { // Necesita ~60 puntos para totales
+            // Verifica si el item cabe en la página actual (dejando espacio para totales)
+            if (currentY + requiredHeight > doc.page.height - doc.page.margins.bottom - 70) { // 70: Espacio para totales + margen
+                doc.addPage();
+                currentY = doc.page.margins.top; // Reiniciar Y en la nueva página
+                currentY = drawTableHeader(currentY); // Redibujar encabezados
+                doc.font('Helvetica').fontSize(9); // Restablecer fuente para items
+            }
+
+            // Dibuja los datos del item
+            doc.text(item.Description || 'N/A', itemX, currentY, { width: qtyX - itemX - 10, align: 'left' });
+            doc.text((item.Quantity || 1).toString(), qtyX, currentY, { width: 50, align: 'right' });
+            // <<< ADAPTACIÓN: Usa la función formatCurrency >>>
+            doc.text(formatCurrency(item.UnitPrice), priceX, currentY, { width: 70, align: 'right' });
+            doc.text(formatCurrency(itemTotal), totalX, currentY, { width: 70, align: 'right' });
+
+            currentY += requiredHeight; // Mueve el cursor Y para el siguiente item
+        });
+
+        // Línea final de la tabla
+        doc.moveTo(itemX, currentY).lineTo(tableRight, currentY).lineWidth(0.5).strokeColor("#aaaaaa").stroke();
+        currentY += 5; // Pequeño espacio después de la tabla
+
+        // --- Sección de Totales ---
+        // Verifica si hay espacio suficiente para los totales al final de la página
+        if (currentY > doc.page.height - doc.page.margins.bottom - 60) { // Necesita ~60 puntos
             doc.addPage();
             currentY = doc.page.margins.top;
         } else {
-            currentY += jump; // Espacio antes de totales
+            currentY += jump; // Espacio antes de los totales si cabe
         }
+
         const totalsYStart = currentY;
         doc.font('Helvetica').fontSize(10);
-        doc.text('Subtotal:', totalsX, totalsYStart, { width: 90, align: 'left' }); doc.text(`${formatCurrency(invoice.Subtotal)}`, totalX, totalsYStart, { width: 70, align: 'right'}); currentY += jump;
-        doc.text('Descuento:', totalsX, currentY, { width: 90, align: 'left' }); doc.text(`-${formatCurrency(invoice.Discount)}`, totalX, currentY, { width: 70, align: 'right'}); currentY += jump;
-        doc.text('Impuestos:', totalsX, currentY, { width: 90, align: 'left' }); doc.text(`+${formatCurrency(invoice.TaxAmount)}`, totalX, currentY, { width: 70, align: 'right'}); currentY += 5;
-        doc.moveTo(totalsX - 10, currentY).lineTo(tableRight, currentY).lineWidth(1).strokeColor("#000000").stroke(); currentY += 5;
-        doc.font('Helvetica-Bold').fontSize(11).text('TOTAL:', totalsX, currentY, { width: 90, align: 'left' }); doc.text(`${formatCurrency(invoice.TotalAmount)}`, totalX, currentY, { width: 70, align: 'right'});
 
-        // Notas Adicionales
-        if (invoice.Notes) {
-             if (currentY > doc.page.height - doc.page.margins.bottom - 40) { doc.addPage(); currentY = doc.page.margins.top;} else { doc.moveDown(3);}
-             doc.font('Helvetica').fontSize(9).text('Notas:', itemX);
-             doc.text(invoice.Notes, { indent: 10, width: tableRight - itemX });
+        // Dibuja cada línea de total usando formatCurrency
+        doc.text('Subtotal:', totalsX, totalsYStart, { width: 90, align: 'left' });
+        doc.text(formatCurrency(invoice.Subtotal), totalX, totalsYStart, { width: 70, align: 'right'});
+        currentY += jump;
+
+        if (invoice.Discount > 0) { // Solo mostrar descuento si es mayor a 0
+            doc.text('Descuento:', totalsX, currentY, { width: 90, align: 'left' });
+            doc.text(`-${formatCurrency(invoice.Discount)}`, totalX, currentY, { width: 70, align: 'right'});
+            currentY += jump;
         }
 
-        // --- Fin Contenido PDF ---
-        doc.end(); // Finalizar PDF y enviar stream
-        console.log(`PDF generado para Factura #${invoiceId}`);
+        if (invoice.TaxAmount > 0) { // Solo mostrar impuestos si son mayores a 0
+             doc.text('Impuestos:', totalsX, currentY, { width: 90, align: 'left' }); // Puedes especificar el % si lo tienes: `IVA (${invoice.TaxRate || 16}%):`
+             doc.text(`+${formatCurrency(invoice.TaxAmount)}`, totalX, currentY, { width: 70, align: 'right'});
+             currentY += jump;
+         }
+
+        // Línea antes del total final
+        doc.moveTo(totalsX - 10, currentY).lineTo(tableRight, currentY).lineWidth(1).strokeColor("#000000").stroke();
+        currentY += 5; // Espacio después de la línea
+
+        // Total Final
+        doc.font('Helvetica-Bold').fontSize(11);
+        doc.text('TOTAL:', totalsX, currentY, { width: 90, align: 'left' });
+        doc.text(formatCurrency(invoice.TotalAmount), totalX, currentY, { width: 70, align: 'right'});
+        currentY += jump;
+
+
+        // --- Notas Adicionales ---
+        if (invoice.Notes && invoice.Notes.trim() !== '') {
+             // Verifica espacio para las notas
+             if (currentY > doc.page.height - doc.page.margins.bottom - 40) {
+                 doc.addPage();
+                 currentY = doc.page.margins.top;
+             } else {
+                 currentY += jump * 1.5; // Más espacio antes de las notas
+             }
+             doc.font('Helvetica-Bold').fontSize(9).text('Notas Adicionales:', itemX, currentY);
+             currentY += jump * 0.6;
+             doc.font('Helvetica').fontSize(9).text(invoice.Notes, itemX + 10, currentY, {
+                 width: tableRight - itemX - 10 // Ancho completo menos margen
+             });
+         }
+
+        // --- Finalizar el PDF ---
+        doc.end(); // ¡Importante! Cierra el stream y finaliza el PDF.
+
+        console.log(`PDF para Factura ID: ${invoiceId} enviado correctamente.`);
+
     } catch (error) {
-         console.error(`Error en GET /api/invoices/${invoiceId}/download:`, error.message);
-         if (!res.headersSent) { res.status(500).send("Error al generar PDF."); } else { res.end(); }
+        console.error(`Error crítico al generar PDF para Factura ID ${invoiceId}:`, error);
+        // Si las cabeceras ya se enviaron (doc.pipe inició), no podemos enviar un status 500.
+        // El pipe se romperá, resultando en un PDF corrupto o incompleto para el cliente.
+        if (!res.headersSent) {
+            res.status(500).send("Error interno del servidor al generar el PDF.");
+        } else {
+             // Intentar terminar la respuesta si es posible, aunque probablemente ya esté cerrada por el error del pipe.
+             res.end();
+         }
     }
 });
+
+
+////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////
+//PIEZAS
+// ==========================================================
+//  INICIO - RUTAS API PARA INVENTARIO (Añadir a server.js)
+// ==========================================================
+
+// Asegúrate de tener 'pool' y 'sql' disponibles y configurados globalmente
+
+// --- Rutas de Inventario (InventoryItems) ---
+
+// GET /api/inventory/summary - Obtener resumen para tarjetas
+app.get('/api/inventory/summary', async (req, res, next) => {
+  // #swagger.tags = ['Inventory']
+  // #swagger.summary = 'Obtener resumen del estado del inventario'
+  if (!pool) { return res.status(503).json({ message: "Error DB: Pool no disponible." }); }
+  try {
+      const request = pool.request();
+      // Ejecutar consultas para los contadores y el valor total
+      const totalQuery = `SELECT COUNT(*) AS TotalItems FROM InventoryItems;`;
+      const lowStockQuery = `SELECT COUNT(*) AS LowStockItems FROM InventoryItems WHERE LowStockThreshold IS NOT NULL AND StockQuantity <= LowStockThreshold AND StockQuantity > 0;`; // Mayor que 0
+      const outOfStockQuery = `SELECT COUNT(*) AS OutOfStockItems FROM InventoryItems WHERE StockQuantity <= 0;`;
+      // Calcular valor total (Stock * Precio Unitario), ignorando nulos
+      const valueQuery = `SELECT SUM(ISNULL(StockQuantity, 0) * ISNULL(UnitPrice, 0)) AS TotalValue FROM InventoryItems WHERE StockQuantity > 0;`;
+
+      // Ejecutar en paralelo
+      const [totalResult, lowStockResult, outOfStockResult, valueResult] = await Promise.all([
+          request.query(totalQuery),
+          request.query(lowStockQuery),
+          request.query(outOfStockQuery),
+          request.query(valueQuery)
+      ]);
+
+      const summary = {
+          total: totalResult.recordset[0]?.TotalItems || 0,
+          low: lowStockResult.recordset[0]?.LowStockItems || 0,
+          out: outOfStockResult.recordset[0]?.OutOfStockItems || 0,
+          value: parseFloat(valueResult.recordset[0]?.TotalValue || 0)
+      };
+      res.json(summary);
+
+  } catch (error) {
+      console.error("Error en GET /api/inventory/summary:", error);
+      next(error); // Pasar al manejador de errores global
+  }
+});
+
+// GET /api/inventory - Obtener lista de items (con filtros)
+app.get('/api/inventory', async (req, res, next) => {
+  // #swagger.tags = ['Inventory']
+  // #swagger.summary = 'Obtener lista de items del inventario con filtros'
+  // #swagger.parameters['search'] = { description: 'Buscar por Nombre o SKU', type: 'string', in: 'query' }
+  // #swagger.parameters['category'] = { description: 'Filtrar por categoría', type: 'string', in: 'query' }
+  if (!pool) { return res.status(503).json({ message: "Error DB" }); }
+  const { search, category } = req.query;
+
+  try {
+      let query = `SELECT ItemID, Name, SKU, Category, StockQuantity, LowStockThreshold, UnitPrice, Supplier, LastUpdated FROM InventoryItems WHERE 1=1`; // Selecciona columnas específicas
+      const request = pool.request();
+      const conditions = [];
+
+      if (search) {
+          conditions.push("(Name LIKE @SearchPattern OR SKU LIKE @SearchPattern)");
+          request.input('SearchPattern', sql.NVarChar, `%${search}%`);
+      }
+      if (category) {
+          conditions.push("Category = @Category");
+          request.input('Category', sql.NVarChar, category);
+      }
+
+      if (conditions.length > 0) { query += " AND " + conditions.join(" AND "); }
+      query += " ORDER BY Name ASC;"; // Ordenar alfabéticamente por nombre
+
+      const result = await request.query(query);
+      res.json(result.recordset);
+
+  } catch (error) {
+      console.error("Error en GET /api/inventory:", error);
+      next(error);
+  }
+});
+
+// GET /api/inventory/:id - Obtener detalles de UN item (para editar)
+app.get('/api/inventory/:id', async (req, res, next) => {
+  // #swagger.tags = ['Inventory']
+  // #swagger.summary = 'Obtener detalles de un item de inventario específico'
+  /* #swagger.parameters['id'] = { description: 'ID del item', type: 'integer', required: true } */
+  if (!pool) { return res.status(503).json({ message: "Error DB" }); }
+  const itemId = parseInt(req.params.id);
+  if (isNaN(itemId)) { return res.status(400).json({ message: "ID de item inválido." }); }
+
+  try {
+      const request = pool.request();
+      request.input('ItemID', sql.Int, itemId);
+      const query = `SELECT ItemID, Name, SKU, Category, StockQuantity, LowStockThreshold, UnitPrice, Supplier, LastUpdated FROM InventoryItems WHERE ItemID = @ItemID`;
+      const result = await request.query(query);
+
+      if (!result.recordset || result.recordset.length === 0) {
+          return res.status(404).json({ message: "Item de inventario no encontrado." });
+      }
+      res.json(result.recordset[0]); // Devolver el primer (y único) resultado
+
+  } catch (error) {
+      console.error(`Error en GET /api/inventory/${itemId}:`, error);
+      next(error);
+  }
+});
+
+
+// POST /api/inventory - Añadir nuevo item
+app.post('/api/inventory', async (req, res, next) => {
+  // #swagger.tags = ['Inventory']
+  // #swagger.summary = 'Añadir un nuevo item al inventario'
+  /* #swagger.parameters['body'] = { description: 'Datos del nuevo item', required: true, schema: { $ref: "#/definitions/InventoryItemInput" } } */
+  if (!pool) { return res.status(503).json({ message: "Error DB" }); }
+  const { name, sku, category, stockQuantity, lowStockThreshold, unitPrice, supplier } = req.body;
+
+  // Validación básica
+  const errors = [];
+  if (!name?.trim()) errors.push("Nombre es requerido.");
+  const quantity = parseInt(stockQuantity || '0');
+  if (isNaN(quantity) || quantity < 0) errors.push("Cantidad en Stock debe ser número >= 0.");
+  const threshold = lowStockThreshold ? parseInt(lowStockThreshold) : null;
+  if (threshold !== null && (isNaN(threshold) || threshold < 0)) errors.push("Umbral Stock Bajo debe ser número >= 0.");
+  const price = unitPrice ? parseFloat(unitPrice) : null;
+  if (price !== null && (isNaN(price) || price < 0)) errors.push("Precio Unitario debe ser número >= 0.");
+  if (errors.length > 0) { return res.status(400).json({ message: "Errores de validación.", errors }); }
+
+  try {
+      // Verificar si SKU ya existe (si se proporcionó y la columna es UNIQUE)
+      if (sku?.trim()) {
+           const checkRequest = pool.request();
+           checkRequest.input('SKU', sql.NVarChar, sku.trim());
+           const checkResult = await checkRequest.query("SELECT ItemID FROM InventoryItems WHERE SKU = @SKU");
+           if (checkResult.recordset.length > 0) {
+               return res.status(409).json({ message: `El SKU '${sku.trim()}' ya está en uso.`}); // 409 Conflict
+           }
+      }
+
+      // Insertar
+      const request = pool.request();
+      request.input('Name', sql.NVarChar, name.trim());
+      request.input('SKU', sql.NVarChar, sku?.trim() || null); // Usar trim o null
+      request.input('Category', sql.NVarChar, category || null);
+      request.input('StockQuantity', sql.Int, quantity);
+      request.input('LowStockThreshold', sql.Int, threshold); // Puede ser null
+      request.input('UnitPrice', sql.Decimal(10, 2), price); // Puede ser null, asume DECIMAL(10,2)
+      request.input('Supplier', sql.NVarChar, supplier || null);
+      // LastUpdated usa DEFAULT GETDATE()
+
+      const query = `
+          INSERT INTO InventoryItems ([Name], [SKU], [Category], [StockQuantity], [LowStockThreshold], [UnitPrice], [Supplier])
+          OUTPUT INSERTED.*
+          VALUES (@Name, @SKU, @Category, @StockQuantity, @LowStockThreshold, @UnitPrice, @Supplier);
+      `;
+      const result = await request.query(query);
+      res.status(201).json(result.recordset[0]); // Devolver item creado
+
+  } catch (error) {
+      console.error("Error en POST /api/inventory:", error);
+      // Manejar error de constraint UNIQUE específico si ocurre al insertar SKU
+      if (error.number === 2627 || error.message.toLowerCase().includes('unique constraint')) {
+           return res.status(409).json({ message: `El SKU '${sku.trim()}' ya existe.` });
+      }
+      next(error);
+  }
+});
+
+// PUT /api/inventory/:id - Actualizar item existente
+app.put('/api/inventory/:id', async (req, res, next) => {
+  // #swagger.tags = ['Inventory']
+  // #swagger.summary = 'Actualizar un item de inventario existente'
+  /* #swagger.parameters['id'] = { description: 'ID del item a actualizar', type: 'integer', required: true } */
+  /* #swagger.parameters['body'] = { description: 'Datos a actualizar del item', required: true, schema: { $ref: "#/definitions/InventoryItemInput" } } */
+  if (!pool) { return res.status(503).json({ message: "Error DB" }); }
+  const itemId = parseInt(req.params.id);
+  const { name, sku, category, stockQuantity, lowStockThreshold, unitPrice, supplier } = req.body;
+
+  // Validaciones
+  if (isNaN(itemId)) { return res.status(400).json({ message: "ID de item inválido." }); }
+  const errors = [];
+  if (!name?.trim()) errors.push("Nombre es requerido."); // Asumimos que nombre siempre debe estar
+  const quantity = parseInt(stockQuantity || '0'); // Permitir actualizar a 0
+  if (isNaN(quantity) || quantity < 0) errors.push("Cantidad debe ser número >= 0.");
+  const threshold = lowStockThreshold ? parseInt(lowStockThreshold) : (lowStockThreshold === '' ? null : undefined); // Permitir borrar umbral
+  if (threshold !== undefined && threshold !== null && (isNaN(threshold) || threshold < 0)) errors.push("Umbral debe ser número >= 0 o vacío.");
+  const price = unitPrice ? parseFloat(unitPrice) : (unitPrice === '' ? null : undefined); // Permitir borrar precio
+  if (price !== undefined && price !== null && (isNaN(price) || price < 0)) errors.push("Precio debe ser número >= 0 o vacío.");
+  if (errors.length > 0) { return res.status(400).json({ message: "Errores de validación.", errors }); }
+
+  try {
+      // Verificar si SKU ya existe para OTRO item (si se está actualizando)
+      if (sku?.trim()) {
+           const checkRequest = pool.request();
+           checkRequest.input('SKU', sql.NVarChar, sku.trim());
+           checkRequest.input('ItemID', sql.Int, itemId);
+           const checkResult = await checkRequest.query("SELECT ItemID FROM InventoryItems WHERE SKU = @SKU AND ItemID != @ItemID");
+           if (checkResult.recordset.length > 0) {
+               return res.status(409).json({ message: `El SKU '${sku.trim()}' ya está en uso por otro item.`});
+           }
+      }
+
+      // Construir query dinámico de actualización
+      const request = pool.request();
+      request.input('ItemID', sql.Int, itemId);
+      const setClauses = [];
+
+      // Añadir campos a actualizar solo si se proporcionaron en el body
+      // (Se asume que name y stockQuantity siempre vienen por la validación anterior)
+      setClauses.push("[Name] = @Name"); request.input('Name', sql.NVarChar, name.trim());
+      setClauses.push("[StockQuantity] = @StockQuantity"); request.input('StockQuantity', sql.Int, quantity);
+
+      // SKU: Actualizar si se proporciona, incluso si es vacío (para borrarlo)
+      if (sku !== undefined) { setClauses.push("[SKU] = @SKU"); request.input('SKU', sql.NVarChar, sku?.trim() || null); }
+      if (category !== undefined) { setClauses.push("[Category] = @Category"); request.input('Category', sql.NVarChar, category || null); }
+      if (threshold !== undefined) { setClauses.push("[LowStockThreshold] = @LowStockThreshold"); request.input('LowStockThreshold', sql.Int, threshold); } // threshold puede ser null
+      if (price !== undefined) { setClauses.push("[UnitPrice] = @UnitPrice"); request.input('UnitPrice', sql.Decimal(10,2), price); } // price puede ser null
+      if (supplier !== undefined) { setClauses.push("[Supplier] = @Supplier"); request.input('Supplier', sql.NVarChar, supplier || null); }
+
+      // Siempre actualizar LastUpdated
+      setClauses.push("[LastUpdated] = GETDATE()");
+
+      if (setClauses.length <= 1) { // Solo se actualizaría LastUpdated si no viene nada más
+           return res.status(400).json({ message: "No hay campos válidos para actualizar." });
+      }
+
+      const query = `
+          UPDATE InventoryItems
+          SET ${setClauses.join(', ')}
+          OUTPUT INSERTED.*
+          WHERE ItemID = @ItemID;
+      `;
+
+      const result = await request.query(query);
+
+      if (!result.recordset || result.recordset.length === 0) { // Chequeo por si acaso, aunque debería dar error antes si no existe
+          return res.status(404).json({ message: "Item no encontrado para actualizar." });
+      }
+      res.json(result.recordset[0]); // Devolver item actualizado
+
+  } catch (error) {
+      console.error(`Error en PUT /api/inventory/${itemId}:`, error);
+      if (error.number === 2627 || error.message.toLowerCase().includes('unique constraint')) {
+           return res.status(409).json({ message: `El SKU '${sku.trim()}' ya existe.` });
+      }
+      next(error);
+  }
+});
+
+
+// DELETE /api/inventory/:id - Eliminar item
+app.delete('/api/inventory/:id', async (req, res, next) => {
+  // #swagger.tags = ['Inventory']
+  // #swagger.summary = 'Eliminar un item del inventario'
+  /* #swagger.parameters['id'] = { description: 'ID del item a eliminar', type: 'integer', required: true } */
+  if (!pool) { return res.status(503).json({ message: "Error DB" }); }
+  const itemId = parseInt(req.params.id);
+  if (isNaN(itemId)) { return res.status(400).json({ message: "ID de item inválido." }); }
+
+  try {
+      const request = pool.request();
+      request.input("id", sql.Int, itemId);
+      // Podrías verificar dependencias aquí (ej: si está en una factura no borrable) antes de eliminar
+      const result = await request.query("DELETE FROM InventoryItems WHERE ItemID = @id; SELECT @@ROWCOUNT AS RowsAffected;");
+
+      if (result.recordset[0]?.RowsAffected === 0) {
+          return res.status(404).json({ message: "Item no encontrado." });
+      }
+      res.status(200).json({ success: true, message: "Item eliminado exitosamente." }); // Usar 200 con mensaje o 204 sin mensaje
+
+  } catch (error) {
+      console.error(`Error en DELETE /api/inventory/${itemId}:`, error);
+      // Manejar errores de FK si el item no se puede borrar por estar en uso
+       if (error.number === 547) { // Código típico de error de Foreign Key constraint
+           return res.status(409).json({ message: "No se puede eliminar el item, está en uso en facturas u otras áreas." }); // 409 Conflict
+       }
+      next(error);
+  }
+});
+
+
 
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////

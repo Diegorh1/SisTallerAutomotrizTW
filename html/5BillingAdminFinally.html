@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facturación (Admin) - AutoCare Rodriguez</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* Estilos para indicador de carga y estrellas */
+        .saving-indicator::after { content: '...'; display: inline-block; animation: dots 1s steps(5, end) infinite; }
+        @keyframes dots { 0%, 20% { content: '.'; } 40% { content: '..'; } 60%, 100% { content: '...'; } }
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
+        .feedback-rating .text-yellow-500 { color: #f59e0b; }
+        .feedback-rating .text-gray-300 { color: #d1d5db; }
+        /* Clases para status */
+        .status-paid { background-color: #d1fae5; color: #065f46; }
+        .status-pending { background-color: #fef3c7; color: #92400e; }
+        .status-overdue { background-color: #fee2e2; color: #991b1b; }
+        .status-cancelled { background-color: #f3f4f6; color: #374151; }
+        .status-default { background-color: #f3f4f6; color: #1f2937; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <nav class="bg-gray-800 text-white px-6 py-4">
+        <div class="flex items-center justify-between">
+            <h1 class="text-2xl font-bold">AutoCare Rodriguez</h1>
+            <div class="flex space-x-4">
+                
+                <a href="index.html"> <button class="px-4 py-2 rounded hover:bg-gray-700">Clientes</button> </a>
+                <a href="admin_appointments.html"> <button class="px-4 py-2 rounded hover:bg-gray-700">Citas</button></a> 
+                <a href="admin_segservice.html"> <button class="px-4 py-2 rounded hover:bg-gray-700">SegService</button></a> 
+                <a href="admin_inventory.html"> <button class="px-4 py-2 rounded hover:bg-gray-700">Inventario</button></a> 
+                <a href="admin_billing.html"> <button class="px-4 py-2 rounded bg-gray-700">Facturación</button></a> 
+                <a href="admin_users.html"> <button class="px-4 py-2 rounded hover:bg-gray-700">Usuarios</button> </a> 
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto px-4 py-6">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white rounded-lg shadow p-6"> <h3 class="text-lg font-semibold mb-2">Total Facturas</h3> <p id="total-invoices-count" class="text-3xl font-bold text-blue-600">--</p> </div>
+            <div class="bg-white rounded-lg shadow p-6"> <h3 class="text-lg font-semibold mb-2">Pago Pendiente</h3> <p id="pending-invoices-count" class="text-3xl font-bold text-yellow-600">--</p> </div>
+            <div class="bg-white rounded-lg shadow p-6"> <h3 class="text-lg font-semibold mb-2">Vencidas</h3> <p id="overdue-invoices-count" class="text-3xl font-bold text-red-600">--</p> </div>
+            <div class="bg-white rounded-lg shadow p-6"> <h3 class="text-lg font-semibold mb-2">Ingresos (Pagado)</h3> <p id="revenue-total" class="text-3xl font-bold text-green-600">$ --</p> </div>
+        </div>
+
+        <div class="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4 mb-6">
+            <input type="text" id="invoice-search" placeholder="Buscar #Factura o Cliente..." class="flex-1 px-4 py-2 border rounded-lg">
+            <select id="invoice-status-filter" class="px-4 py-2 border rounded-lg">
+                <option value="">Todos los Estados</option>
+                <option value="paid">Pagada</option>
+                <option value="pending">Pendiente</option>
+                <option value="overdue">Vencida</option>
+                <option value="cancelled">Cancelada</option>
+            </select>
+            <button id="filter-invoices-btn" class="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700">Filtrar</button>
+            <button id="open-new-invoice-modal-btn" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">Nueva Factura</button>
+        </div>
+
+        <div id="api-error-message" class="mb-4 p-3 text-red-700 bg-red-100 border border-red-400 rounded hidden"></div>
+
+        <div class="bg-white rounded-lg shadow overflow-hidden">
+            <table class="w-full">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Factura #</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cliente</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha Factura</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Monto Total</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="admin-invoices-table-body" class="divide-y divide-gray-200">
+                    <tr id="loading-invoices-row"><td colspan="6" class="text-center py-4 text-gray-500">Cargando facturas...</td></tr>
+                    
+                </tbody>
+            </table>
+            <div id="no-admin-invoices" class="text-center py-4 text-gray-500 hidden">No se encontraron facturas.</div>
+        </div>
+    </div>
+
+    <div id="newInvoiceModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto p-4">
+        <div class="bg-white rounded-lg p-8 max-w-3xl w-full m-auto">
+             <div class="flex justify-between items-center mb-6"> <h3 class="text-xl font-semibold">Generar Nueva Factura</h3> <button id="close-new-invoice-modal-btn" type="button" class="text-gray-400 hover:text-gray-600"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button> </div>
+             <form id="new-invoice-form" class="space-y-4">
+                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4"><div><label for="invoice-customer" class="block text-sm font-medium mb-1">Cliente</label><select id="invoice-customer" name="userId" required class="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500"><option value="">Seleccione Cliente...</option></select></div><div><label for="invoice-appointment" class="block text-sm font-medium mb-1">Cita Asociada (Opcional)</label><select id="invoice-appointment" name="appointmentId" class="w-full px-4 py-2 border rounded-lg focus:ring-blue-500 focus:border-blue-500" disabled><option value="">Ninguna / Manual</option></select></div></div>
+                 <div><label class="block text-sm font-medium mb-1">Items / Servicios</label><div id="invoice-items-container" class="space-y-2 border p-3 rounded-md max-h-60 overflow-y-auto">{/* Items se añaden aquí */}</div><button type="button" id="add-invoice-item-btn" class="mt-2 text-sm text-blue-600 hover:text-blue-800">+ Añadir Item</button><button type="button" id="add-service-from-catalog-btn" class="mt-2 ml-4 text-sm text-green-600 hover:text-green-800">+ Añadir Servicio Catálogo</button></div>
+                 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t"><div><label for="invoice-discount" class="block text-sm font-medium mb-1">Descuento ($ o %)</label><input type="text" id="invoice-discount" name="discount" placeholder="Ej: 10 o 5%" class="w-full px-4 py-2 border rounded-lg"></div><div><label for="invoice-tax" class="block text-sm font-medium mb-1">Impuesto (%)</label><input type="number" id="invoice-tax" name="taxRate" value="0" step="0.01" min="0" class="w-full px-4 py-2 border rounded-lg"></div><div><label for="invoice-status" class="block text-sm font-medium mb-1">Estado Inicial</label><select id="invoice-status" name="status" required class="w-full px-4 py-2 border rounded-lg"><option value="pending" selected>Pendiente</option><option value="paid">Pagada</option></select></div></div>
+                 <div class="border-t pt-4 mt-4"><div class="flex justify-end text-right"><div class="text-sm text-gray-500"><p>Subtotal:</p><p>Descuento:</p><p>Impuestos:</p><p class="text-lg font-semibold mt-1 text-gray-800">Total:</p></div><div class="ml-4 font-medium text-right"><p id="invoice-subtotal" class="text-sm text-gray-500">$0.00</p><p id="invoice-discount-amount" class="text-sm text-gray-500">-$0.00</p><p id="invoice-tax-amount" class="text-sm text-gray-500">+$0.00</p><p id="invoice-total-amount" class="text-lg font-semibold mt-1 text-gray-800">$0.00</p></div></div></div>
+                 <div id="new-invoice-feedback" class="text-red-600 text-sm mt-2"></div>
+                 <div class="flex justify-end space-x-4 pt-4 border-t"><button type="button" id="cancel-new-invoice-btn" class="px-6 py-2 border rounded-lg hover:bg-gray-100">Cancelar</button><button type="submit" id="submit-new-invoice-btn" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Generar Factura</button></div>
+             </form>
+        </div>
+    </div>
+
+    <div id="serviceCatalogModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[70] p-4"> {/* Mayor z-index */}
+         <div class="bg-white rounded-lg p-6 max-w-xl w-full m-auto">
+             <div class="flex justify-between items-center mb-4"><h3 class="text-lg font-semibold">Seleccionar Servicio</h3><button id="close-service-catalog-modal-btn" type="button" class="text-gray-400 hover:text-gray-600">&times;</button></div>
+             <input type="text" id="service-catalog-search" placeholder="Buscar servicio..." class="w-full px-3 py-2 border rounded mb-3">
+             <div id="service-catalog-list" class="max-h-60 overflow-y-auto border rounded p-2 space-y-1"><p class="text-center text-gray-500">Cargando...</p></div>
+             <div class="mt-4 text-right"><button type="button" id="add-selected-services-btn" class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">Añadir Seleccionados</button></div>
+         </div>
+    </div>
+
+    <div id="viewInvoiceModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] overflow-y-auto p-4"> {/* Mayor z-index */}
+        <div class="bg-white rounded-lg p-8 max-w-3xl w-full m-auto shadow-xl">
+            <div class="flex justify-between items-center mb-6 pb-3 border-b"><h3 class="text-2xl font-semibold text-gray-800">Detalles de Factura</h3><button id="close-view-invoice-modal-btn" type="button" class="text-gray-500 hover:text-gray-700 text-2xl">&times;</button></div>
+            <div id="view-invoice-loading" class="text-center py-10 hidden">Cargando detalles...</div>
+            <div id="view-invoice-error" class="text-center py-10 text-red-600 hidden">Error al cargar detalles.</div>
+            <div id="view-invoice-content" class="hidden">
+                <div class="grid grid-cols-2 gap-8 mb-6 text-sm"><div><h4 class="font-semibold text-gray-700 mb-1">Emisor:</h4><p class="font-bold">AutoCare Rodriguez</p><p>Calle Falsa 123</p><p>Ciudad Ejemplo, CP 12345</p><p>Tel: 555-1234</p><p>Email: taller@ejemplo.com</p></div><div class="text-right"><h4 class="font-semibold text-gray-700 mb-1">Cliente:</h4><p id="view-invoice-customer-name" class="font-bold"></p><p id="view-invoice-customer-email"></p><p id="view-invoice-customer-phone"></p></div></div>
+                <div class="grid grid-cols-3 gap-4 mb-6 text-sm border-t border-b py-3"><div><span class="font-semibold text-gray-600 block">Factura #:</span><span id="view-invoice-number"></span></div><div><span class="font-semibold text-gray-600 block">Fecha Emisión:</span><span id="view-invoice-date"></span></div><div><span class="font-semibold text-gray-600 block">Vencimiento:</span><span id="view-invoice-due-date"></span></div><div class="col-span-3 text-right"><span class="font-semibold text-gray-600">Estado:</span><span id="view-invoice-status" class="font-bold uppercase ml-2"></span></div></div>
+                <h4 class="text-lg font-semibold text-gray-800 mb-2">Detalle</h4><div class="overflow-x-auto mb-6"><table class="w-full text-sm border"><thead class="bg-gray-100"><tr><th class="px-4 py-2 text-left font-semibold">Descripción</th><th class="px-4 py-2 text-right font-semibold">Cant.</th><th class="px-4 py-2 text-right font-semibold">P. Unit.</th><th class="px-4 py-2 text-right font-semibold">Importe</th></tr></thead><tbody id="view-invoice-items-body" class="divide-y"></tbody></table></div> 
+                <div class="flex justify-end mb-6"><div class="w-64 text-sm"><div class="flex justify-between py-1"><span>Subtotal:</span><span id="view-invoice-subtotal" class="font-medium"></span></div><div class="flex justify-between py-1"><span>Descuento:</span><span id="view-invoice-discount" class="font-medium"></span></div><div class="flex justify-between py-1 border-b"><span>Impuestos:</span><span id="view-invoice-tax" class="font-medium"></span></div><div class="flex justify-between py-2 mt-1"><span>TOTAL:</span><span id="view-invoice-grand-total" class="font-semibold text-lg"></span></div></div></div>
+                <div id="view-invoice-notes-section" class="text-sm text-gray-600 border-t pt-3 hidden"><p class="font-semibold mb-1">Notas:</p><p id="view-invoice-notes"></p></div>
+            </div>
+            <div class="flex justify-end space-x-3 mt-6 pt-4 border-t"><button id="close-view-invoice-modal-btn-bottom" type="button" class="px-5 py-2 border rounded-lg hover:bg-gray-100">Cerrar</button></div>
+        </div>
+    </div>
+
+    <footer class="bg-gray-800 text-white py-6 px-6 mt-8">
+        <div class="container mx-auto text-center">
+            <p>&copy; <span id="current-year-admin-billing"></span> AutoCare Rodriguez. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+        // --- Funciones básicas para Modales ---
+        function showModal(modalId) { document.getElementById(modalId)?.classList.remove('hidden'); }
+        function hideModal(modalId) { document.getElementById(modalId)?.classList.add('hidden'); }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- Configuración y Elementos ---
+            const API_BASE_URL = 'http://localhost:3000'; // Revisa puerto/host si es necesario
+            const adminInvoicesTableBody = document.getElementById('admin-invoices-table-body');
+            const loadingInvoicesRow = document.getElementById('loading-invoices-row');
+            const noAdminInvoicesDiv = document.getElementById('no-admin-invoices');
+            const apiErrorMessageDiv = document.getElementById('api-error-message');
+            // Elementos Modal Nueva Factura
+            const newInvoiceModal = document.getElementById('newInvoiceModal');
+            const openNewInvoiceBtn = document.getElementById('open-new-invoice-modal-btn');
+            const closeNewInvoiceBtn = document.getElementById('close-new-invoice-modal-btn');
+            const cancelNewInvoiceBtn = document.getElementById('cancel-new-invoice-btn');
+            const newInvoiceForm = document.getElementById('new-invoice-form');
+            const customerSelect = document.getElementById('invoice-customer');
+            const appointmentSelect = document.getElementById('invoice-appointment');
+            const itemsContainer = document.getElementById('invoice-items-container');
+            const addItemBtn = document.getElementById('add-invoice-item-btn');
+            const addServiceCatalogBtn = document.getElementById('add-service-from-catalog-btn');
+            const discountInput = document.getElementById('invoice-discount');
+            const taxInput = document.getElementById('invoice-tax');
+            const subtotalSpan = document.getElementById('invoice-subtotal');
+            const discountAmountSpan = document.getElementById('invoice-discount-amount');
+            const taxAmountSpan = document.getElementById('invoice-tax-amount');
+            const totalAmountSpan = document.getElementById('invoice-total-amount');
+            const newInvoiceFeedbackDiv = document.getElementById('new-invoice-feedback');
+            const submitNewInvoiceBtn = document.getElementById('submit-new-invoice-btn');
+            // Elementos Modal Catálogo Servicios
+            const serviceCatalogModal = document.getElementById('serviceCatalogModal');
+            const closeServiceCatalogBtn = document.getElementById('close-service-catalog-modal-btn');
+            const serviceCatalogListDiv = document.getElementById('service-catalog-list');
+            const addSelectedServicesBtn = document.getElementById('add-selected-services-btn');
+            const serviceCatalogSearchInput = document.getElementById('service-catalog-search');
+            // Elementos Modal Ver Factura
+            const viewInvoiceModal = document.getElementById('viewInvoiceModal');
+            const closeViewInvoiceBtnTop = document.getElementById('close-view-invoice-modal-btn');
+            const closeViewInvoiceBtnBottom = document.getElementById('close-view-invoice-modal-btn-bottom');
+            const viewInvoiceContent = document.getElementById('view-invoice-content');
+            const viewInvoiceLoading = document.getElementById('view-invoice-loading');
+            const viewInvoiceError = document.getElementById('view-invoice-error');
+            const viewInvoiceCustomerName = document.getElementById('view-invoice-customer-name');
+            const viewInvoiceCustomerEmail = document.getElementById('view-invoice-customer-email');
+            const viewInvoiceCustomerPhone = document.getElementById('view-invoice-customer-phone');
+            const viewInvoiceNumber = document.getElementById('view-invoice-number');
+            const viewInvoiceDate = document.getElementById('view-invoice-date');
+            const viewInvoiceDueDate = document.getElementById('view-invoice-due-date');
+            const viewInvoiceStatus = document.getElementById('view-invoice-status');
+            const viewInvoiceItemsBody = document.getElementById('view-invoice-items-body');
+            const viewInvoiceSubtotal = document.getElementById('view-invoice-subtotal');
+            const viewInvoiceDiscount = document.getElementById('view-invoice-discount');
+            const viewInvoiceTax = document.getElementById('view-invoice-tax');
+            const viewInvoiceGrandTotal = document.getElementById('view-invoice-grand-total');
+            const viewInvoiceNotesSection = document.getElementById('view-invoice-notes-section');
+            const viewInvoiceNotes = document.getElementById('view-invoice-notes');
+            // Filtros y Resumen
+            const filterInvoicesBtn = document.getElementById('filter-invoices-btn');
+            const invoiceSearchInput = document.getElementById('invoice-search');
+            const invoiceStatusFilter = document.getElementById('invoice-status-filter');
+            const totalInvoicesSpan = document.getElementById('total-invoices-count');
+            const pendingInvoicesSpan = document.getElementById('pending-invoices-count');
+            const overdueInvoicesSpan = document.getElementById('overdue-invoices-count');
+            const revenueSpan = document.getElementById('revenue-total');
+
+            let serviceCatalogData = []; // Cache
+
+            // --- Funciones Auxiliares ---
+            function showApiError(message, element = apiErrorMessageDiv) { element.textContent = `Error: ${message}`; element.classList.remove('hidden'); setTimeout(() => hideApiError(element), 6000); }
+            function hideApiError(element = apiErrorMessageDiv) { element.classList.add('hidden'); element.textContent = ''; }
+            async function apiFetch(endpoint, options = {}) {
+                options.headers = { 'Content-Type': 'application/json', ...options.headers };
+                hideApiError(); if (options.feedbackDiv) hideApiError(options.feedbackDiv);
+                try {
+                    const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
+                    if (!response.ok) { let err = { message: `Error ${response.status}` }; try { err = await response.json();} catch(e){} throw new Error(err.message || `Error ${response.status}`); }
+                    return response.status === 204 ? null : await response.json();
+                } catch (error) {
+                    console.error('API Fetch Error:', endpoint, error);
+                    const target = options.feedbackDiv || (options.suppressGlobalError ? null : apiErrorMessageDiv);
+                    if(target) showApiError(error.message || 'Error conexión.', target);
+                    throw error;
+                }
+            }
+            function invoiceNumberFromId(id) { return `#INV-${String(id).padStart(3,'0')}`; }
+            function formatCurrency(amount) { return `$${(amount || 0).toFixed(2)}`; }
+            function formatDate(dateString, style = 'long') { return dateString ? new Date(dateString).toLocaleDateString('es-MX', { dateStyle: style }) : 'N/A'; }
+            function formatShortDate(dateString) { return formatDate(dateString, 'short'); }
+            function formatStatus(status) { const map={'paid':{t:'Pagada',c:'bg-green-100 text-green-800'},'pending':{t:'Pendiente',c:'bg-yellow-100 text-yellow-800'},'overdue':{t:'Vencida',c:'bg-red-100 text-red-800'},'cancelled':{t:'Anulada',c:'bg-gray-100 text-gray-800'}}; const i=map[status?.toLowerCase()]||{t:status||'?',c:'bg-gray-200'}; return `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${i.c}">${i.t}</span>`; }
+
+
+            // --- Lógica Modales ---
+            openNewInvoiceBtn?.addEventListener('click', () => { resetNewInvoiceForm(); loadCustomersForInvoice(); showModal('newInvoiceModal'); });
+            closeNewInvoiceBtn?.addEventListener('click', () => hideModal('newInvoiceModal'));
+            cancelNewInvoiceBtn?.addEventListener('click', () => hideModal('newInvoiceModal'));
+            addServiceCatalogBtn?.addEventListener('click', () => { loadServiceCatalog(); showModal('serviceCatalogModal'); });
+            closeServiceCatalogBtn?.addEventListener('click', () => hideModal('serviceCatalogModal'));
+            closeViewInvoiceBtnTop?.addEventListener('click', () => hideModal('viewInvoiceModal'));
+            closeViewInvoiceBtnBottom?.addEventListener('click', () => hideModal('viewInvoiceModal')); // Listener añadido
+
+            // --- Lógica Modal Nueva Factura ---
+            function resetNewInvoiceForm() { newInvoiceForm.reset(); itemsContainer.innerHTML = ''; addInvoiceItemRow(); calculateInvoiceTotals(); newInvoiceFeedbackDiv.textContent = ''; appointmentSelect.innerHTML = '<option value="">Ninguna/Manual</option>'; appointmentSelect.disabled = true; customerSelect.innerHTML = '<option value="">Cargando...</option>'; hideApiError(newInvoiceFeedbackDiv); }
+            addItemBtn?.addEventListener('click', () => addInvoiceItemRow());
+            function addInvoiceItemRow(desc='', qty=1, price=0) { const div=document.createElement('div'); div.className='invoice-item flex items-center gap-2 mb-2'; div.innerHTML=`<input name="itemDescription[]" placeholder="Descripción" class="flex-grow px-3 py-1 border rounded text-sm" required value="${desc.replace(/"/g,'&quot;')}"><input type="number" name="itemQuantity[]" value="${qty}" min="1" class="w-16 px-2 py-1 border rounded text-sm text-right" required><input type="number" name="itemPrice[]" value="${price.toFixed(2)}" step="0.01" min="0" class="w-24 px-2 py-1 border rounded text-sm text-right" required><button type="button" class="remove-item-btn text-red-500 h:text-red-700 text-sm p-1" title="Eliminar">✕</button>`; itemsContainer.appendChild(div); div.querySelector('.remove-item-btn').addEventListener('click', (e)=>{e.target.closest('.invoice-item').remove(); if(!itemsContainer.children.length) addInvoiceItemRow(); calculateInvoiceTotals();}); div.querySelectorAll('input').forEach(i=>i.addEventListener('input', calculateInvoiceTotals)); calculateInvoiceTotals();}
+            itemsContainer.addEventListener('input', (e) => { if(e.target.matches('input[name^="item"]')) calculateInvoiceTotals(); });
+            function calculateInvoiceTotals() { let sub=0; itemsContainer.querySelectorAll('.invoice-item').forEach(r=>{sub+=(parseFloat(r.querySelector('[name="itemQuantity[]"]').value)||0)*(parseFloat(r.querySelector('[name="itemPrice[]"]').value)||0);}); const dStr=discountInput.value.trim(); let dAmt=0; if(dStr.endsWith('%')){dAmt=sub*(parseFloat(dStr.replace('%',''))||0)/100;}else{dAmt=parseFloat(dStr)||0;} dAmt=Math.max(0,dAmt); const subAD=Math.max(0,sub-dAmt); const taxR=parseFloat(taxInput.value)||0; const taxAmt=subAD*(taxR/100); const total=subAD+taxAmt; subtotalSpan.textContent=formatCurrency(sub); discountAmountSpan.textContent=`-${formatCurrency(dAmt)}`; taxAmountSpan.textContent=`+${formatCurrency(taxAmt)}`; totalAmountSpan.textContent=formatCurrency(total); }
+            discountInput?.addEventListener('input', calculateInvoiceTotals); taxInput?.addEventListener('input', calculateInvoiceTotals);
+            async function loadCustomersForInvoice() { customerSelect.disabled=true; customerSelect.innerHTML='<option value="">Cargando...</option>'; try{ const u=await apiFetch('/api/users',{suppressGlobalError:true}); customerSelect.innerHTML='<option value="">Seleccione...</option>'; u.forEach(usr=>{const o=document.createElement('option');o.value=usr.ID; o.textContent=`${usr.FullName} (${usr.Email||''})`; customerSelect.appendChild(o);});}catch(err){customerSelect.innerHTML='<option value="">Error</option>'; showApiError(err.message,newInvoiceFeedbackDiv);}finally{customerSelect.disabled=false;} }
+            customerSelect?.addEventListener('change', async (e)=>{ const uid=e.target.value; appointmentSelect.innerHTML='<option value="">Cargando...</option>'; appointmentSelect.disabled=true; if(!uid){appointmentSelect.innerHTML='<option value="">Ninguna/Manual</option>'; return;} try{ const apps=await apiFetch(`/api/appointments?userId=${uid}&status=completed`,{suppressGlobalError:true}); appointmentSelect.innerHTML='<option value="">Ninguna/Manual</option>'; if(apps.length>0){apps.forEach(a=>{const o=document.createElement('option');o.value=a.AppointmentID; const dt=formatShortDate(a.AppointmentDateTime); o.textContent=`${dt}-${a.ServiceType}(${a.VehicleDescription})`; o.dataset.appointmentData=JSON.stringify(a); appointmentSelect.appendChild(o);});}else{appointmentSelect.innerHTML+='<option value="" disabled>Sin citas completadas</option>';}}catch(err){appointmentSelect.innerHTML='<option value="">Error</option>';showApiError(err.message,newInvoiceFeedbackDiv);}finally{appointmentSelect.disabled=false;} });
+            appointmentSelect?.addEventListener('change', (e)=>{ const opt=e.target.selectedOptions[0]; if(opt?.value && opt.dataset.appointmentData){try{ const d=JSON.parse(opt.dataset.appointmentData);const desc=`Servicio Cita #${d.AppointmentID}: ${d.ServiceType}`;const fst=itemsContainer.querySelector('.invoice-item');const fstD=fst?.querySelector('input[name="itemDescription[]"]');if(fst&&fstD&&!fstD.value&&itemsContainer.children.length===1){ fstD.value=desc; const catS=serviceCatalogData.find(s=>s.Name.toLowerCase()===d.ServiceType.toLowerCase()); if(catS)fst.querySelector('input[name="itemPrice[]"]').value=(catS.DefaultPrice||0).toFixed(2); else fst.querySelector('input[name="itemPrice[]"]').value='0.00'; fst.querySelector('input[name="itemQuantity[]"]').value=1;}else{addInvoiceItemRow(desc,1,0);} calculateInvoiceTotals();}catch(err){console.error(err);}}});
+            async function loadServiceCatalog() { if(serviceCatalogData?.length>0){renderServiceCatalog(serviceCatalogData);return;} serviceCatalogListDiv.innerHTML='<p>Cargando...</p>'; serviceCatalogSearchInput.value=''; try{ serviceCatalogData=await apiFetch('/api/services',{suppressGlobalError:true}); renderServiceCatalog(serviceCatalogData);}catch(err){serviceCatalogListDiv.innerHTML='<p class="text-red-500">Error.</p>';}}
+            function renderServiceCatalog(services) { serviceCatalogListDiv.innerHTML='';if(!services?.length){serviceCatalogListDiv.innerHTML='<p>No hay.</p>'; return;} services.forEach(s=>{const d=document.createElement('div');d.className='flex items-center justify-between p-1 hover:bg-gray-100 rounded'; d.innerHTML=`<label class="flex items-center space-x-2 text-sm cursor-pointer flex-grow mr-2"><input type="checkbox" class="form-checkbox h-4 w-4 service-catalog-checkbox" value="${s.ServiceID}" data-name="${s.Name}" data-price="${s.DefaultPrice||0}"><span>${s.Name}</span></label><span class="text-sm text-gray-600 font-mono">${formatCurrency(s.DefaultPrice)}</span>`;serviceCatalogListDiv.appendChild(d);});}
+            serviceCatalogSearchInput?.addEventListener('input',(e)=>{const t=e.target.value.toLowerCase();renderServiceCatalog(serviceCatalogData.filter(s=>s.Name.toLowerCase().includes(t)));});
+            addSelectedServicesBtn?.addEventListener('click',()=>{const c=serviceCatalogListDiv.querySelectorAll('.service-catalog-checkbox:checked');if(c.length===0)return; const fst=itemsContainer.querySelector('.invoice-item');const fstD=fst?.querySelector('input[name="itemDescription[]"]'); let rF=fst&&!fstD.value&&itemsContainer.children.length===1; c.forEach((chk,i)=>{const n=chk.dataset.name;const p=parseFloat(chk.dataset.price);if(i===0&&rF){fstD.value=n; fst.querySelector('input[name="itemQuantity[]"]').value=1; fst.querySelector('input[name="itemPrice[]"]').value=p.toFixed(2);}else{addInvoiceItemRow(n,1,p);} chk.checked=false;}); calculateInvoiceTotals();hideModal('serviceCatalogModal');});
+            newInvoiceForm?.addEventListener('submit', async (e)=>{ e.preventDefault();newInvoiceFeedbackDiv.textContent='';hideApiError(); const fd=new FormData(newInvoiceForm);const items=[]; const ds=fd.getAll('itemDescription[]'); const qs=fd.getAll('itemQuantity[]'); const ps=fd.getAll('itemPrice[]'); for(let i=0;i<ds.length;i++){if(ds[i].trim()){const q=parseInt(qs[i]||'1');const p=parseFloat(ps[i]||'0');if(isNaN(q)||q<=0||isNaN(p)||p<0){newInvoiceFeedbackDiv.textContent=`Err línea ${i+1}: Qty/Precio inv.`; return;} items.push({description:ds[i],quantity:q,unitPrice:p});}} if(items.length===0){newInvoiceFeedbackDiv.textContent='Añada items.'; return;} const invD={userId:parseInt(fd.get('userId')),appointmentId:fd.get('appointmentId')?parseInt(fd.get('appointmentId')):null,discount:fd.get('discount')||'0',taxRate:parseFloat(fd.get('taxRate')||'0'),status:fd.get('status'),items:items}; if(isNaN(invD.userId)||!invD.userId){newInvoiceFeedbackDiv.textContent='Seleccione cliente.';return;} console.log("Enviando:", invD); submitNewInvoiceBtn.disabled=true; submitNewInvoiceBtn.classList.add('saving-indicator'); submitNewInvoiceBtn.textContent='Generando'; try{ const crInv=await apiFetch('/api/invoices',{method:'POST',body:JSON.stringify(invD),feedbackDiv:newInvoiceFeedbackDiv}); hideModal('newInvoiceModal'); alert(`Factura #${crInv.invoice?.InvoiceID||'Nva'} generada.`); loadAdminInvoices(); loadBillingSummary();}catch(err){}finally{submitNewInvoiceBtn.disabled=false; submitNewInvoiceBtn.classList.remove('saving-indicator'); submitNewInvoiceBtn.textContent='Generar Factura';}});
+
+            // --- Lógica Tabla Admin ---
+            async function loadAdminInvoices() { loadingInvoicesRow.style.display=''; noAdminInvoicesDiv.classList.add('hidden'); adminInvoicesTableBody.innerHTML=''; adminInvoicesTableBody.appendChild(loadingInvoicesRow); hideApiError(); try{ const p=new URLSearchParams();const sT=invoiceSearchInput.value.trim();const sF=invoiceStatusFilter.value; if(sT)p.append('search',sT);if(sF)p.append('status',sF); const invs=await apiFetch(`/api/invoices?${p.toString()}`); loadingInvoicesRow.style.display='none'; if(invs?.length>0){adminInvoicesTableBody.innerHTML=''; invs.forEach(renderAdminInvoiceRow);}else{adminInvoicesTableBody.innerHTML=''; noAdminInvoicesDiv.classList.remove('hidden');}}catch(err){loadingInvoicesRow.style.display='none'; adminInvoicesTableBody.innerHTML=`<tr><td colspan="6" class="text-center py-4 text-red-500">Error.</td></tr>`;}}
+            function renderAdminInvoiceRow(invoice) { const invDate=formatShortDate(invoice.InvoiceDate); const statusHTML=formatStatus(invoice.Status); const invNum=invoiceNumberFromId(invoice.InvoiceID); const rowHTML=`<tr class="hover:bg-gray-50" data-invoice-id="${invoice.InvoiceID}"><td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${invNum}</td><td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${invoice.User?.FullName||'N/A'}</td><td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${invDate}</td><td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${formatCurrency(invoice.TotalAmount)}</td><td class="px-6 py-4 whitespace-nowrap">${statusHTML}</td><td class="px-6 py-4 whitespace-nowrap text-sm font-medium"><button class="text-blue-600 hover:text-blue-800 mr-3 view-invoice-btn" title="Ver Detalles">Ver</button>${invoice.Status!=='cancelled'&&invoice.Status!=='paid'?`<button class="text-red-600 hover:text-red-800 cancel-invoice-btn" title="Anular">Anular</button>`:''}</td></tr>`; adminInvoicesTableBody.insertAdjacentHTML('beforeend', rowHTML);}
+            filterInvoicesBtn?.addEventListener('click', loadAdminInvoices); invoiceSearchInput?.addEventListener('keypress', (e)=>{if(e.key==='Enter')loadAdminInvoices();}); invoiceStatusFilter?.addEventListener('change', loadAdminInvoices);
+
+             // --- NUEVO: Listener tabla admin (Ver y Anular) ---
+             adminInvoicesTableBody.addEventListener('click', async (e) => {
+                 const target = e.target; const row = target.closest('tr'); if (!row) return;
+                 const invoiceId = row.dataset.invoiceId; const invoiceNumberText = invoiceNumberFromId(invoiceId);
+
+                 // Botón VER
+                 if (target.classList.contains('view-invoice-btn')) {
+                    viewInvoiceContent.classList.add('hidden'); viewInvoiceError.classList.add('hidden'); viewInvoiceLoading.classList.remove('hidden'); hideApiError(); showModal('viewInvoiceModal');
+                    try {
+                        const invoiceData = await apiFetch(`/api/invoices/${invoiceId}`, { suppressGlobalError: true }); // Llama a API detalles
+                        if (!invoiceData?.invoiceHeader || !invoiceData.items) throw new Error("Respuesta API inesperada.");
+                        populateViewInvoiceModal(invoiceData); // Llena el modal
+                        viewInvoiceLoading.classList.add('hidden'); viewInvoiceContent.classList.remove('hidden');
+                    } catch (error) { viewInvoiceLoading.classList.add('hidden'); viewInvoiceError.textContent=`Error: ${error.message}`; viewInvoiceError.classList.remove('hidden'); showApiError(error.message); } // Muestra error global también
+                 }
+                 // Botón ANULAR
+                 else if (target.classList.contains('cancel-invoice-btn')) {
+                     if(confirm(`¿Anular Factura ${invoiceNumberText}?`)) {
+                         target.disabled=true; target.classList.add('saving-indicator'); target.textContent='Anulando'; hideApiError();
+                         try {
+                             await apiFetch(`/api/invoices/${invoiceId}/status`,{method:'PATCH',body:JSON.stringify({status:'cancelled'}),suppressGlobalError:true});
+                             alert(`Factura ${invoiceNumberText} anulada.`); loadAdminInvoices(); loadBillingSummary();
+                         } catch(error){ alert(`Error: ${error.message}`); target.disabled=false; target.classList.remove('saving-indicator'); target.textContent='Anular'; }
+                     }
+                 }
+             });
+
+             // --- NUEVO: Poblar Modal Ver Factura ---
+             function populateViewInvoiceModal(data) {
+                const header = data.invoiceHeader; const items = data.items;
+                viewInvoiceCustomerName.textContent=header.User?.FullName||'N/A'; viewInvoiceCustomerEmail.textContent=header.User?.Email||''; viewInvoiceCustomerPhone.textContent=header.User?.PhoneNumber||'';
+                viewInvoiceNumber.textContent=invoiceNumberFromId(header.InvoiceID); viewInvoiceDate.textContent=formatDate(header.InvoiceDate); viewInvoiceDueDate.textContent=formatDate(header.DueDate); viewInvoiceStatus.textContent=header.Status?.toUpperCase()||'?';
+                viewInvoiceItemsBody.innerHTML='';
+                if(items.length > 0){items.forEach(item=>{const q=item.Quantity||1;const up=item.UnitPrice||0;const lt=q*up; const r=document.createElement('tr');r.innerHTML=`<td class="px-4 py-2 border-b">${item.Description||''}</td><td class="px-4 py-2 border-b text-right">${q}</td><td class="px-4 py-2 border-b text-right">${formatCurrency(up)}</td><td class="px-4 py-2 border-b text-right font-medium">${formatCurrency(lt)}</td>`; viewInvoiceItemsBody.appendChild(r);});}
+                else { viewInvoiceItemsBody.innerHTML='<tr><td colspan="4" class="text-center py-3 text-gray-500 italic">No items.</td></tr>'; }
+                viewInvoiceSubtotal.textContent=formatCurrency(header.Subtotal); viewInvoiceDiscount.textContent=`-${formatCurrency(header.Discount)}`; viewInvoiceTax.textContent=`+${formatCurrency(header.TaxAmount)}`; viewInvoiceGrandTotal.textContent=formatCurrency(header.TotalAmount);
+                if(header.Notes){viewInvoiceNotes.textContent=header.Notes; viewInvoiceNotesSection.classList.remove('hidden');}else{viewInvoiceNotesSection.classList.add('hidden');}
+             }
+
+            // --- Lógica Resumen Admin ---
+            async function loadBillingSummary() { totalInvoicesSpan.textContent='...';pendingInvoicesSpan.textContent='...';overdueInvoicesSpan.textContent='...';revenueSpan.textContent='$ ...'; try{ const s=await apiFetch('/api/billing/summary');totalInvoicesSpan.textContent=s.total||0;pendingInvoicesSpan.textContent=s.pending||0;overdueInvoicesSpan.textContent=s.overdue||0;revenueSpan.textContent=formatCurrency(s.revenue);}catch(err){totalInvoicesSpan.textContent='Err';pendingInvoicesSpan.textContent='Err';overdueInvoicesSpan.textContent='Err';revenueSpan.textContent='Err';}}
+
+            // --- Inicialización Admin ---
+            document.getElementById('current-year-admin-billing').textContent = new Date().getFullYear();
+            loadAdminInvoices(); loadBillingSummary(); addInvoiceItemRow(); // Fila inicial modal
+
+        });
+    </script>
+
+</body>
+</html

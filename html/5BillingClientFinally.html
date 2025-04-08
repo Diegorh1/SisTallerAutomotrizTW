@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>1
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mis Facturas0000 - AutoCare Rodriguez</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Estilos para indicador de carga */
+        .saving-indicator::after { content: '...'; display: inline-block; animation: dots 1s steps(5, end) infinite; }
+        @keyframes dots { 0%, 20% { content: '.'; } 40% { content: '..'; } 60%, 100% { content: '...'; } }
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
+        /* Clases para status */
+        .status-paid { background-color: #d1fae5; color: #065f46; } /* bg-green-100 text-green-800 */
+        .status-pending { background-color: #fef3c7; color: #92400e; } /* bg-yellow-100 text-yellow-800 */
+        .status-overdue { background-color: #fee2e2; color: #991b1b; } /* bg-red-100 text-red-800 */
+        .status-cancelled { background-color: #f3f4f6; color: #374151; } /* bg-gray-100 text-gray-700 */
+        .status-default { background-color: #f3f4f6; color: #1f2937; } /* bg-gray-100 text-gray-800 */
+    </style>
+</head>
+<body class="bg-gray-50">
+     <nav class="bg-gray-800 text-white px-6 py-4">
+        <div class="flex items-center justify-between">
+            <h1 class="text-2xl font-bold">AutoCare Rodriguez</h1>
+            <div class="flex items-center space-x-4">
+                <span id="welcome-message-client" class="text-sm hidden"></span>
+                <a href="portal_cliente.html#upcoming-section"> <button class="px-4 py-2 rounded hover:bg-gray-700">Citas</button> </a>
+                <a href="portal_cliente.html#history-section"> <button class="px-4 py-2 rounded hover:bg-gray-700">Historial</button> </a>
+                <a href="client_billing.html"> <button class="px-4 py-2 rounded bg-gray-700">Mis Facturas</button> </a> </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto px-4 py-6">
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">Mis Facturas</h2>
+
+            <div id="api-error-message-client" class="mb-4 p-3 text-red-700 bg-red-100 border border-red-400 rounded hidden"></div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Factura #</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Monto</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="client-invoices-table-body" class="divide-y divide-gray-200">
+                        <tr id="loading-client-invoices-row">
+                            <td colspan="5" class="text-center py-4 text-gray-500">Cargando tus facturas...</td>
+                        </tr>
+                        </tbody>
+                </table>
+                 <div id="no-client-invoices" class="text-center py-4 text-gray-500 hidden">No tienes facturas registradas.</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="paymentModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-8 max-w-md w-full">
+             <div class="flex justify-between items-center mb-4">
+                 <h3 class="text-xl font-semibold">Realizar Pago</h3>
+                  <button id="close-payment-modal-btn" type="button" class="text-gray-400 hover:text-gray-600">
+                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                 </button>
+             </div>
+            <form id="payment-form" class="space-y-4">
+                <input type="hidden" id="payment-invoice-id">
+                <p class="text-sm">Factura: <span id="payment-invoice-number" class="font-medium"></span></p>
+                <div>
+                    <label for="payment-method" class="block text-sm font-medium mb-1">Método de Pago</label>
+                    <select id="payment-method" name="paymentMethod" class="w-full px-4 py-2 border rounded-lg">
+                        <option value="Cash">Efectivo/Transferencia (Marcar como Pagado)</option>
+                        <option value="Credit Card" disabled>Tarjeta de Crédito (No disponible)</option>
+                        <option value="PayPal" disabled>PayPals (No disponible)</option>
+                    </select>
+                     <p class="text-xs text-gray-500 mt-1">Nota: El pago real se realiza por fuera. Esto solo actualiza el estado.</p>
+                </div>
+                <div class="border-t pt-4">
+                    <div class="flex justify-between text-lg font-semibold">
+                        <span>Monto Indicado:</span>
+                        <span id="payment-amount">$0.00</span>
+                    </div>
+                </div>
+                 <div id="payment-form-feedback" class="text-red-600 text-sm mt-2"></div>
+                <div class="flex justify-end space-x-4">
+                    <button type="button" id="cancel-payment-btn" class="px-4 py-2 border rounded-lg hover:bg-gray-100">Cancelar</button>
+                    <button type="button" id="submit-payment-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Marcar como Pagada</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <footer class="bg-gray-800 text-white py-6 px-6 mt-8">
+        <div class="container mx-auto text-center">
+            <p>&copy; <span id="current-year-client-billing"></span> AutoCare Rodriguez. Todos los derechos reservados.</p>
+        </div>
+    </footer>
+
+     <script>
+         // --- Funciones básicas para Modales ---
+         function showModal(modalId) { document.getElementById(modalId)?.classList.remove('hidden'); }
+         function hideModal(modalId) { document.getElementById(modalId)?.classList.add('hidden'); }
+
+         document.addEventListener('DOMContentLoaded', () => {
+             // --- Configuración y Simulación Usuario ---
+             const API_BASE_URL = 'http://localhost:3000';
+             
+             const CURRENT_USER_ID = 25; 
+             const CURRENT_USER_IDENTIFIER = 'juniorh1a@gmail.com'; 
+             // ----------------------------1----------
+
+             // --- Elementos DOM ---
+             const clientInvoicesTableBody = document.getElementById('client-invoices-table-body');
+             const loadingClientInvoicesRow = document.getElementById('loading-client-invoices-row');
+             const noClientInvoicesDiv = document.getElementById('no-client-invoices');
+             const apiErrorMessageDivClient = document.getElementById('api-error-message-client');
+             const welcomeMessageSpanClient = document.getElementById('welcome-message-client');
+             // Modal Pago
+             const paymentModal = document.getElementById('paymentModal');
+             const closePaymentModalBtn = document.getElementById('close-payment-modal-btn');
+             const cancelPaymentBtn = document.getElementById('cancel-payment-btn');
+             const paymentForm = document.getElementById('payment-form');
+             const submitPaymentBtn = document.getElementById('submit-payment-btn');
+             const paymentInvoiceIdInput = document.getElementById('payment-invoice-id');
+             const paymentInvoiceNumberSpan = document.getElementById('payment-invoice-number');
+             const paymentAmountSpan = document.getElementById('payment-amount');
+             const paymentMethodSelect = document.getElementById('payment-method');
+             const paymentFormFeedbackDiv = document.getElementById('payment-form-feedback');
+
+             // --- Funciones Auxiliares ---
+             function showApiErrorClient(message, element = apiErrorMessageDivClient) {
+                 element.textContent = `Error: ${message}`;
+                 element.classList.remove('hidden');
+                 setTimeout(() => hideApiErrorClient(element), 6000);
+             }
+             function hideApiErrorClient(element = apiErrorMessageDivClient) {
+                 element.classList.add('hidden');
+                 element.textContent = '';
+             }
+             async function apiFetchClient(endpoint, options = {}) {
+                 options.headers = { 'Content-Type': 'application/json', ...options.headers };
+                 hideApiErrorClient(); // Ocultar global
+                 if(options.feedbackDiv) hideApiErrorClient(options.feedbackDiv); // Ocultar específico
+
+                 try {
+                     const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
+                     if (!response.ok) {
+                         let errorData = { message: `Error HTTP ${response.status}: ${response.statusText}` };
+                         try { errorData = await response.json(); } catch (e) {}
+                         throw new Error(errorData.message || `Error ${response.status}`);
+                     }
+                     
+                     if (response.headers.get('Content-Type')?.includes('application/json')) {
+                        return response.status === 204 ? null : await response.json();
+                     }
+                     return response; // Devolver la respuesta para otros casos (aunque no se usa para descarga aquí)
+
+                 } catch (error) {
+                     console.error('API Fetch Error (Client):', endpoint, error);
+                     const targetDiv = options.feedbackDiv || apiErrorMessageDivClient;
+                     showApiErrorClient(error.message || 'Error de conexión.', targetDiv);
+                     throw error;
+                 }
+             }
+             function getStatusClassClient(status) { // Adaptar clases si son diferentes
+                 const statusMap = {
+                     'paid': 'status-paid', 'pending': 'status-pending',
+                     'overdue': 'status-overdue', 'cancelled': 'status-cancelled'
+                 };
+                 return statusMap[status?.toLowerCase()] || 'status-default';
+             }
+
+             // --- Lógica Principal ---
+
+             // Cargar Facturas del Cliente
+             async function loadClientInvoices() {
+                 loadingClientInvoicesRow.style.display = '';
+                 noClientInvoicesDiv.classList.add('hidden');
+                 clientInvoicesTableBody.innerHTML = ''; clientInvoicesTableBody.appendChild(loadingClientInvoicesRow);
+                 hideApiErrorClient(); // Ocultar error global
+
+                 try {
+                     // Llama a la API filtrando por el ID del usuario simulado
+                     const invoices = await apiFetchClient(`/api/invoices?userId=${CURRENT_USER_ID}`);
+
+                     loadingClientInvoicesRow.style.display = 'none';
+                     if (invoices && invoices.length > 0) {
+                         clientInvoicesTableBody.innerHTML = ''; // Limpiar antes de renderizar
+                         // Ordenar por fecha descendente (la API ya lo hace, pero por si acaso)
+                         invoices.sort((a, b) => new Date(b.InvoiceDate) - new Date(a.InvoiceDate));
+                         invoices.forEach(renderClientInvoiceRow);
+                     } else {
+                         clientInvoicesTableBody.innerHTML = '';
+                         noClientInvoicesDiv.classList.remove('hidden'); // Mostrar mensaje "No tienes facturas"
+                     }
+
+                 } catch (error) {
+                     loadingClientInvoicesRow.style.display = 'none';
+                     clientInvoicesTableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-red-500">Error al cargar tus facturas. Intenta más tarde.</td></tr>`;
+                     // El error global ya se muestra en apiFetchClient
+                 }
+             }
+
+             // Renderizar Fila de Factura Cliente
+             function renderClientInvoiceRow(invoice) {
+                 const invoiceNumber = `#INV-${String(invoice.InvoiceID).padStart(3, '0')}`;
+                 const invoiceDate = new Date(invoice.InvoiceDate).toLocaleDateString('es-MX', {dateStyle: 'short'});
+                 const statusClass = getStatusClassClient(invoice.Status);
+                 const statusText = invoice.Status?.replace(/_/g, ' ') || 'Desconocido'; // Reemplaza guiones bajos
+
+                 // <<< CORRECCIÓN 1: Se reemplaza el botón de descarga por un enlace <a>
+                 const rowHTML = `
+                     <tr class="hover:bg-gray-50" data-invoice-id="${invoice.InvoiceID}" data-amount="${(invoice.TotalAmount || 0).toFixed(2)}" data-number="${invoiceNumber}" data-status="${invoice.Status}">
+                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${invoiceNumber}</td>
+                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${invoiceDate}</td>
+                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">$${(invoice.TotalAmount || 0).toFixed(2)}</td>
+                         <td class="px-6 py-4 whitespace-nowrap">
+                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}">${statusText}</span>
+                         </td>
+                         <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                             ${invoice.Status === 'pending' || invoice.Status === 'overdue' ?
+                             `<button class="text-blue-600 hover:text-blue-800 mr-3 pay-invoice-btn">Pagar Ahora</button>` : ''
+                             }
+                             <a href="${API_BASE_URL}/api/invoices/${invoice.InvoiceID}/download"
+                                class="text-indigo-600 hover:text-indigo-900 download-invoice-link"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                download="Factura-${invoiceNumber}.pdf">
+                                Descargar
+                             </a>
+                         </td>
+                     </tr>`;
+                 clientInvoicesTableBody.insertAdjacentHTML('beforeend', rowHTML);
+             }
+
+             // Abrir Modal de Pago y manejar clics en la tabla
+             clientInvoicesTableBody.addEventListener('click', (e) => {
+                 // Acción para Pagar Ahora
+                 if (e.target.classList.contains('pay-invoice-btn')) {
+                     const row = e.target.closest('tr');
+                     const invoiceId = row.dataset.invoiceId;
+                     const amount = row.dataset.amount;
+                     const number = row.dataset.number;
+
+                     paymentInvoiceIdInput.value = invoiceId;
+                     paymentInvoiceNumberSpan.textContent = number;
+                     paymentAmountSpan.textContent = `$${amount}`;
+                     paymentFormFeedbackDiv.textContent = '';
+                     paymentForm.reset();
+                     hideApiErrorClient(paymentFormFeedbackDiv); // Limpiar error específico del modal
+
+                     showModal('paymentModal');
+                 }
+
+                 // <<< CORRECCIÓN 2: Se elimina el bloque 'else if' para 'download-invoice-btn'
+                 // La acción de descarga ahora es manejada directamente por el enlace <a>
+             });
+
+             // Cerrar Modal de Pago
+             closePaymentModalBtn?.addEventListener('click', () => hideModal('paymentModal'));
+             cancelPaymentBtn?.addEventListener('click', () => hideModal('paymentModal'));
+
+            // Marcar Factura como Pagada (Simulación de Pago)
+            submitPaymentBtn?.addEventListener('click', async () => {
+                 const invoiceId = paymentInvoiceIdInput.value;
+                 // const paymentMethod = paymentMethodSelect.value; // Podrías enviar esto si tuvieras tabla Payments
+
+                 if (!invoiceId) return;
+
+                 paymentFormFeedbackDiv.textContent = '';
+                 hideApiErrorClient(paymentFormFeedbackDiv); // Limpiar error modal
+                 submitPaymentBtn.disabled = true;
+                 submitPaymentBtn.textContent = 'Procesando...';
+                 submitPaymentBtn.classList.add('saving-indicator');
+
+                 try {
+                     // Llamar a la API para cambiar el estado a 'paid'
+                     const result = await apiFetchClient(`/api/invoices/${invoiceId}/status`, {
+                         method: 'PATCH',
+                         body: JSON.stringify({ status: 'paid' }),
+                         feedbackDiv: paymentFormFeedbackDiv // Mostrar error en el modal
+                     });
+
+                     console.log(`Factura ${invoiceId} marcada como pagada:`, result);
+                     hideModal('paymentModal');
+                     alert('¡Pago registrado! La factura ha sido marcada como pagada.');
+                     loadClientInvoices(); // Recargar la lista para reflejar el cambio
+
+                 } catch (error) {
+                     // El error ya se muestra en el feedbackDiv del modal por apiFetchClient
+                     console.error("Error al marcar factura como pagada:", error);
+                 } finally {
+                     submitPaymentBtn.disabled = false;
+                     submitPaymentBtn.textContent = 'Marcar como Pagada';
+                     submitPaymentBtn.classList.remove('saving-indicator');
+                 }
+            });
+
+             // --- Inicialización Cliente ---
+             document.getElementById('current-year-client-billing').textContent = new Date().getFullYear();
+              if (CURRENT_USER_IDENTIFIER) {
+                 welcomeMessageSpanClient.textContent = `Bienvenido, ${CURRENT_USER_IDENTIFIER}!`;
+                 welcomeMessageSpanClient.classList.remove('hidden');
+             }
+             loadClientInvoices(); // Carga inicial de facturas del cliente
+
+         });
+     </script>
+
+</body>
+</html>
