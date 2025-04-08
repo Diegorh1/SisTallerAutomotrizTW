@@ -104,7 +104,7 @@
          function showModal(modalId) { document.getElementById(modalId)?.classList.remove('hidden'); }
          function hideModal(modalId) { document.getElementById(modalId)?.classList.add('hidden'); }
 
-        document.addEventListener('DOMContentLoaded', () => {
+         document.addEventListener('DOMContentLoaded', () => {
              // --- Configuración y Simulación Usuario ---
              const API_BASE_URL = 'http://localhost:3000';
              // ¡¡¡ CAMBIA ESTOS VALORES POR UN USUARIO REAL DE TU BASE DE DATOS !!!
@@ -148,11 +148,18 @@
                  try {
                      const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
                      if (!response.ok) {
-                        let errorData = { message: `Error HTTP ${response.status}: ${response.statusText}` };
-                        try { errorData = await response.json(); } catch (e) {}
-                        throw new Error(errorData.message || `Error ${response.status}`);
+                         let errorData = { message: `Error HTTP ${response.status}: ${response.statusText}` };
+                         try { errorData = await response.json(); } catch (e) {}
+                         throw new Error(errorData.message || `Error ${response.status}`);
                      }
-                     return response.status === 204 ? null : await response.json();
+                     // Para la descarga, la respuesta no será JSON si es exitosa, sino el archivo.
+                     // Esta función `apiFetchClient` está pensada para respuestas JSON.
+                     // La descarga se manejará directamente con la etiqueta <a>, no con esta función.
+                     if (response.headers.get('Content-Type')?.includes('application/json')) {
+                        return response.status === 204 ? null : await response.json();
+                     }
+                     return response; // Devolver la respuesta para otros casos (aunque no se usa para descarga aquí)
+
                  } catch (error) {
                      console.error('API Fetch Error (Client):', endpoint, error);
                      const targetDiv = options.feedbackDiv || apiErrorMessageDivClient;
@@ -193,9 +200,9 @@
                      }
 
                  } catch (error) {
-                    loadingClientInvoicesRow.style.display = 'none';
-                    clientInvoicesTableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-red-500">Error al cargar tus facturas. Intenta más tarde.</td></tr>`;
-                    // El error global ya se muestra en apiFetchClient
+                     loadingClientInvoicesRow.style.display = 'none';
+                     clientInvoicesTableBody.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-red-500">Error al cargar tus facturas. Intenta más tarde.</td></tr>`;
+                     // El error global ya se muestra en apiFetchClient
                  }
              }
 
@@ -205,29 +212,35 @@
                  const invoiceDate = new Date(invoice.InvoiceDate).toLocaleDateString('es-MX', {dateStyle: 'short'});
                  const statusClass = getStatusClassClient(invoice.Status);
                  const statusText = invoice.Status?.replace(/_/g, ' ') || 'Desconocido'; // Reemplaza guiones bajos
-                 // Para "Servicio Principal", necesitaríamos los items. Mostramos ID por ahora.
-                 // const serviceDescription = invoice.items?.[0]?.description || 'Ver Detalles'; // Requeriría GET /api/invoices/:id
 
+                 // <<< CORRECCIÓN 1: Se reemplaza el botón de descarga por un enlace <a>
                  const rowHTML = `
                      <tr class="hover:bg-gray-50" data-invoice-id="${invoice.InvoiceID}" data-amount="${(invoice.TotalAmount || 0).toFixed(2)}" data-number="${invoiceNumber}" data-status="${invoice.Status}">
                          <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${invoiceNumber}</td>
                          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${invoiceDate}</td>
                          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">$${(invoice.TotalAmount || 0).toFixed(2)}</td>
                          <td class="px-6 py-4 whitespace-nowrap">
-                            <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}">${statusText}</span>
+                             <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}">${statusText}</span>
                          </td>
                          <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                              ${invoice.Status === 'pending' || invoice.Status === 'overdue' ?
+                             ${invoice.Status === 'pending' || invoice.Status === 'overdue' ?
                              `<button class="text-blue-600 hover:text-blue-800 mr-3 pay-invoice-btn">Pagar Ahora</button>` : ''
                              }
-                             <button class="text-gray-600 hover:text-gray-800 download-invoice-btn">Descargar</button>
+                             <a href="${API_BASE_URL}/api/invoices/${invoice.InvoiceID}/download"
+                                class="text-indigo-600 hover:text-indigo-900 download-invoice-link"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                download="Factura-${invoiceNumber}.pdf">
+                                Descargar
+                             </a>
                          </td>
                      </tr>`;
                  clientInvoicesTableBody.insertAdjacentHTML('beforeend', rowHTML);
              }
 
-             // Abrir Modal de Pago
+             // Abrir Modal de Pago y manejar clics en la tabla
              clientInvoicesTableBody.addEventListener('click', (e) => {
+                 // Acción para Pagar Ahora
                  if (e.target.classList.contains('pay-invoice-btn')) {
                      const row = e.target.closest('tr');
                      const invoiceId = row.dataset.invoiceId;
@@ -243,12 +256,9 @@
 
                      showModal('paymentModal');
                  }
-                 // Descargar (Placeholder)
-                 else if (e.target.classList.contains('download-invoice-btn')) {
-                     const row = e.target.closest('tr');
-                     const invoiceId = row.dataset.invoiceId;
-                     alert(`FUNCIONALIDAD PENDIENTE: Descargar Factura #${invoiceId}\n(Necesitaría un endpoint API GET /api/invoices/${invoiceId}/download o similar)`);
-                 }
+
+                 // <<< CORRECCIÓN 2: Se elimina el bloque 'else if' para 'download-invoice-btn'
+                 // La acción de descarga ahora es manejada directamente por el enlace <a>
              });
 
              // Cerrar Modal de Pago
@@ -267,7 +277,6 @@
                  submitPaymentBtn.disabled = true;
                  submitPaymentBtn.textContent = 'Procesando...';
                  submitPaymentBtn.classList.add('saving-indicator');
-
 
                  try {
                      // Llamar a la API para cambiar el estado a 'paid'
@@ -300,8 +309,8 @@
              }
              loadClientInvoices(); // Carga inicial de facturas del cliente
 
-        });
-    </script>
+         });
+     </script>
 
 </body>
 </html>
