@@ -1306,8 +1306,8 @@ app.get('/api/invoices/:id/download', async (req, res) => {
         const companyName = process.env.COMPANY_NAME || 'AutoCare Rodriguez';
         const companyAddress = process.env.COMPANY_ADDRESS || 'Av. Reforma #100, Col. Centro'; // Ejemplo, ¡CAMBIAR!
         const companyCityCP = process.env.COMPANY_CITY_CP || 'Cuautla, Morelos CP 62740'; // <<< Usando tu ubicación
-        const companyContact = process.env.COMPANY_CONTACT || 'Tel: 735-XXX-XXXX | Email: contacto@autocarerodriguez.com'; // Ejemplo, ¡CAMBIAR!
-        const companyRFC = process.env.COMPANY_RFC || 'RFC: XXXX000000XXX'; // Ejemplo, ¡CAMBIAR! (Opcional pero común en MX)
+        const companyContact = process.env.COMPANY_CONTACT || 'Tel: 777-213-3925 | Email: rodriguez@autocarerodriguez.com'; // Ejemplo, ¡CAMBIAR!
+        const companyRFC = process.env.COMPANY_RFC || 'RFC: ROHDD54'; // Ejemplo, ¡CAMBIAR! (Opcional pero común en MX)
 
         // Escribir información del emisor en el PDF
         doc.fontSize(16).font('Helvetica-Bold').text(companyName, { align: 'right' });
@@ -1458,6 +1458,289 @@ app.get('/api/invoices/:id/download', async (req, res) => {
          }
     }
 });
+
+
+////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////
+//PIEZAS
+// ==========================================================
+//  INICIO - RUTAS API PARA INVENTARIO (Añadir a server.js)
+// ==========================================================
+
+// Asegúrate de tener 'pool' y 'sql' disponibles y configurados globalmente
+
+// --- Rutas de Inventario (InventoryItems) ---
+
+// GET /api/inventory/summary - Obtener resumen para tarjetas
+app.get('/api/inventory/summary', async (req, res, next) => {
+  // #swagger.tags = ['Inventory']
+  // #swagger.summary = 'Obtener resumen del estado del inventario'
+  if (!pool) { return res.status(503).json({ message: "Error DB: Pool no disponible." }); }
+  try {
+      const request = pool.request();
+      // Ejecutar consultas para los contadores y el valor total
+      const totalQuery = `SELECT COUNT(*) AS TotalItems FROM InventoryItems;`;
+      const lowStockQuery = `SELECT COUNT(*) AS LowStockItems FROM InventoryItems WHERE LowStockThreshold IS NOT NULL AND StockQuantity <= LowStockThreshold AND StockQuantity > 0;`; // Mayor que 0
+      const outOfStockQuery = `SELECT COUNT(*) AS OutOfStockItems FROM InventoryItems WHERE StockQuantity <= 0;`;
+      // Calcular valor total (Stock * Precio Unitario), ignorando nulos
+      const valueQuery = `SELECT SUM(ISNULL(StockQuantity, 0) * ISNULL(UnitPrice, 0)) AS TotalValue FROM InventoryItems WHERE StockQuantity > 0;`;
+
+      // Ejecutar en paralelo
+      const [totalResult, lowStockResult, outOfStockResult, valueResult] = await Promise.all([
+          request.query(totalQuery),
+          request.query(lowStockQuery),
+          request.query(outOfStockQuery),
+          request.query(valueQuery)
+      ]);
+
+      const summary = {
+          total: totalResult.recordset[0]?.TotalItems || 0,
+          low: lowStockResult.recordset[0]?.LowStockItems || 0,
+          out: outOfStockResult.recordset[0]?.OutOfStockItems || 0,
+          value: parseFloat(valueResult.recordset[0]?.TotalValue || 0)
+      };
+      res.json(summary);
+
+  } catch (error) {
+      console.error("Error en GET /api/inventory/summary:", error);
+      next(error); // Pasar al manejador de errores global
+  }
+});
+
+// GET /api/inventory - Obtener lista de items (con filtros)
+app.get('/api/inventory', async (req, res, next) => {
+  // #swagger.tags = ['Inventory']
+  // #swagger.summary = 'Obtener lista de items del inventario con filtros'
+  // #swagger.parameters['search'] = { description: 'Buscar por Nombre o SKU', type: 'string', in: 'query' }
+  // #swagger.parameters['category'] = { description: 'Filtrar por categoría', type: 'string', in: 'query' }
+  if (!pool) { return res.status(503).json({ message: "Error DB" }); }
+  const { search, category } = req.query;
+
+  try {
+      let query = `SELECT ItemID, Name, SKU, Category, StockQuantity, LowStockThreshold, UnitPrice, Supplier, LastUpdated FROM InventoryItems WHERE 1=1`; // Selecciona columnas específicas
+      const request = pool.request();
+      const conditions = [];
+
+      if (search) {
+          conditions.push("(Name LIKE @SearchPattern OR SKU LIKE @SearchPattern)");
+          request.input('SearchPattern', sql.NVarChar, `%${search}%`);
+      }
+      if (category) {
+          conditions.push("Category = @Category");
+          request.input('Category', sql.NVarChar, category);
+      }
+
+      if (conditions.length > 0) { query += " AND " + conditions.join(" AND "); }
+      query += " ORDER BY Name ASC;"; // Ordenar alfabéticamente por nombre
+
+      const result = await request.query(query);
+      res.json(result.recordset);
+
+  } catch (error) {
+      console.error("Error en GET /api/inventory:", error);
+      next(error);
+  }
+});
+
+// GET /api/inventory/:id - Obtener detalles de UN item (para editar)
+app.get('/api/inventory/:id', async (req, res, next) => {
+  // #swagger.tags = ['Inventory']
+  // #swagger.summary = 'Obtener detalles de un item de inventario específico'
+  /* #swagger.parameters['id'] = { description: 'ID del item', type: 'integer', required: true } */
+  if (!pool) { return res.status(503).json({ message: "Error DB" }); }
+  const itemId = parseInt(req.params.id);
+  if (isNaN(itemId)) { return res.status(400).json({ message: "ID de item inválido." }); }
+
+  try {
+      const request = pool.request();
+      request.input('ItemID', sql.Int, itemId);
+      const query = `SELECT ItemID, Name, SKU, Category, StockQuantity, LowStockThreshold, UnitPrice, Supplier, LastUpdated FROM InventoryItems WHERE ItemID = @ItemID`;
+      const result = await request.query(query);
+
+      if (!result.recordset || result.recordset.length === 0) {
+          return res.status(404).json({ message: "Item de inventario no encontrado." });
+      }
+      res.json(result.recordset[0]); // Devolver el primer (y único) resultado
+
+  } catch (error) {
+      console.error(`Error en GET /api/inventory/${itemId}:`, error);
+      next(error);
+  }
+});
+
+
+// POST /api/inventory - Añadir nuevo item
+app.post('/api/inventory', async (req, res, next) => {
+  // #swagger.tags = ['Inventory']
+  // #swagger.summary = 'Añadir un nuevo item al inventario'
+  /* #swagger.parameters['body'] = { description: 'Datos del nuevo item', required: true, schema: { $ref: "#/definitions/InventoryItemInput" } } */
+  if (!pool) { return res.status(503).json({ message: "Error DB" }); }
+  const { name, sku, category, stockQuantity, lowStockThreshold, unitPrice, supplier } = req.body;
+
+  // Validación básica
+  const errors = [];
+  if (!name?.trim()) errors.push("Nombre es requerido.");
+  const quantity = parseInt(stockQuantity || '0');
+  if (isNaN(quantity) || quantity < 0) errors.push("Cantidad en Stock debe ser número >= 0.");
+  const threshold = lowStockThreshold ? parseInt(lowStockThreshold) : null;
+  if (threshold !== null && (isNaN(threshold) || threshold < 0)) errors.push("Umbral Stock Bajo debe ser número >= 0.");
+  const price = unitPrice ? parseFloat(unitPrice) : null;
+  if (price !== null && (isNaN(price) || price < 0)) errors.push("Precio Unitario debe ser número >= 0.");
+  if (errors.length > 0) { return res.status(400).json({ message: "Errores de validación.", errors }); }
+
+  try {
+      // Verificar si SKU ya existe (si se proporcionó y la columna es UNIQUE)
+      if (sku?.trim()) {
+           const checkRequest = pool.request();
+           checkRequest.input('SKU', sql.NVarChar, sku.trim());
+           const checkResult = await checkRequest.query("SELECT ItemID FROM InventoryItems WHERE SKU = @SKU");
+           if (checkResult.recordset.length > 0) {
+               return res.status(409).json({ message: `El SKU '${sku.trim()}' ya está en uso.`}); // 409 Conflict
+           }
+      }
+
+      // Insertar
+      const request = pool.request();
+      request.input('Name', sql.NVarChar, name.trim());
+      request.input('SKU', sql.NVarChar, sku?.trim() || null); // Usar trim o null
+      request.input('Category', sql.NVarChar, category || null);
+      request.input('StockQuantity', sql.Int, quantity);
+      request.input('LowStockThreshold', sql.Int, threshold); // Puede ser null
+      request.input('UnitPrice', sql.Decimal(10, 2), price); // Puede ser null, asume DECIMAL(10,2)
+      request.input('Supplier', sql.NVarChar, supplier || null);
+      // LastUpdated usa DEFAULT GETDATE()
+
+      const query = `
+          INSERT INTO InventoryItems ([Name], [SKU], [Category], [StockQuantity], [LowStockThreshold], [UnitPrice], [Supplier])
+          OUTPUT INSERTED.*
+          VALUES (@Name, @SKU, @Category, @StockQuantity, @LowStockThreshold, @UnitPrice, @Supplier);
+      `;
+      const result = await request.query(query);
+      res.status(201).json(result.recordset[0]); // Devolver item creado
+
+  } catch (error) {
+      console.error("Error en POST /api/inventory:", error);
+      // Manejar error de constraint UNIQUE específico si ocurre al insertar SKU
+      if (error.number === 2627 || error.message.toLowerCase().includes('unique constraint')) {
+           return res.status(409).json({ message: `El SKU '${sku.trim()}' ya existe.` });
+      }
+      next(error);
+  }
+});
+
+// PUT /api/inventory/:id - Actualizar item existente
+app.put('/api/inventory/:id', async (req, res, next) => {
+  // #swagger.tags = ['Inventory']
+  // #swagger.summary = 'Actualizar un item de inventario existente'
+  /* #swagger.parameters['id'] = { description: 'ID del item a actualizar', type: 'integer', required: true } */
+  /* #swagger.parameters['body'] = { description: 'Datos a actualizar del item', required: true, schema: { $ref: "#/definitions/InventoryItemInput" } } */
+  if (!pool) { return res.status(503).json({ message: "Error DB" }); }
+  const itemId = parseInt(req.params.id);
+  const { name, sku, category, stockQuantity, lowStockThreshold, unitPrice, supplier } = req.body;
+
+  // Validaciones
+  if (isNaN(itemId)) { return res.status(400).json({ message: "ID de item inválido." }); }
+  const errors = [];
+  if (!name?.trim()) errors.push("Nombre es requerido."); // Asumimos que nombre siempre debe estar
+  const quantity = parseInt(stockQuantity || '0'); // Permitir actualizar a 0
+  if (isNaN(quantity) || quantity < 0) errors.push("Cantidad debe ser número >= 0.");
+  const threshold = lowStockThreshold ? parseInt(lowStockThreshold) : (lowStockThreshold === '' ? null : undefined); // Permitir borrar umbral
+  if (threshold !== undefined && threshold !== null && (isNaN(threshold) || threshold < 0)) errors.push("Umbral debe ser número >= 0 o vacío.");
+  const price = unitPrice ? parseFloat(unitPrice) : (unitPrice === '' ? null : undefined); // Permitir borrar precio
+  if (price !== undefined && price !== null && (isNaN(price) || price < 0)) errors.push("Precio debe ser número >= 0 o vacío.");
+  if (errors.length > 0) { return res.status(400).json({ message: "Errores de validación.", errors }); }
+
+  try {
+      // Verificar si SKU ya existe para OTRO item (si se está actualizando)
+      if (sku?.trim()) {
+           const checkRequest = pool.request();
+           checkRequest.input('SKU', sql.NVarChar, sku.trim());
+           checkRequest.input('ItemID', sql.Int, itemId);
+           const checkResult = await checkRequest.query("SELECT ItemID FROM InventoryItems WHERE SKU = @SKU AND ItemID != @ItemID");
+           if (checkResult.recordset.length > 0) {
+               return res.status(409).json({ message: `El SKU '${sku.trim()}' ya está en uso por otro item.`});
+           }
+      }
+
+      // Construir query dinámico de actualización
+      const request = pool.request();
+      request.input('ItemID', sql.Int, itemId);
+      const setClauses = [];
+
+      // Añadir campos a actualizar solo si se proporcionaron en el body
+      // (Se asume que name y stockQuantity siempre vienen por la validación anterior)
+      setClauses.push("[Name] = @Name"); request.input('Name', sql.NVarChar, name.trim());
+      setClauses.push("[StockQuantity] = @StockQuantity"); request.input('StockQuantity', sql.Int, quantity);
+
+      // SKU: Actualizar si se proporciona, incluso si es vacío (para borrarlo)
+      if (sku !== undefined) { setClauses.push("[SKU] = @SKU"); request.input('SKU', sql.NVarChar, sku?.trim() || null); }
+      if (category !== undefined) { setClauses.push("[Category] = @Category"); request.input('Category', sql.NVarChar, category || null); }
+      if (threshold !== undefined) { setClauses.push("[LowStockThreshold] = @LowStockThreshold"); request.input('LowStockThreshold', sql.Int, threshold); } // threshold puede ser null
+      if (price !== undefined) { setClauses.push("[UnitPrice] = @UnitPrice"); request.input('UnitPrice', sql.Decimal(10,2), price); } // price puede ser null
+      if (supplier !== undefined) { setClauses.push("[Supplier] = @Supplier"); request.input('Supplier', sql.NVarChar, supplier || null); }
+
+      // Siempre actualizar LastUpdated
+      setClauses.push("[LastUpdated] = GETDATE()");
+
+      if (setClauses.length <= 1) { // Solo se actualizaría LastUpdated si no viene nada más
+           return res.status(400).json({ message: "No hay campos válidos para actualizar." });
+      }
+
+      const query = `
+          UPDATE InventoryItems
+          SET ${setClauses.join(', ')}
+          OUTPUT INSERTED.*
+          WHERE ItemID = @ItemID;
+      `;
+
+      const result = await request.query(query);
+
+      if (!result.recordset || result.recordset.length === 0) { // Chequeo por si acaso, aunque debería dar error antes si no existe
+          return res.status(404).json({ message: "Item no encontrado para actualizar." });
+      }
+      res.json(result.recordset[0]); // Devolver item actualizado
+
+  } catch (error) {
+      console.error(`Error en PUT /api/inventory/${itemId}:`, error);
+      if (error.number === 2627 || error.message.toLowerCase().includes('unique constraint')) {
+           return res.status(409).json({ message: `El SKU '${sku.trim()}' ya existe.` });
+      }
+      next(error);
+  }
+});
+
+
+// DELETE /api/inventory/:id - Eliminar item
+app.delete('/api/inventory/:id', async (req, res, next) => {
+  // #swagger.tags = ['Inventory']
+  // #swagger.summary = 'Eliminar un item del inventario'
+  /* #swagger.parameters['id'] = { description: 'ID del item a eliminar', type: 'integer', required: true } */
+  if (!pool) { return res.status(503).json({ message: "Error DB" }); }
+  const itemId = parseInt(req.params.id);
+  if (isNaN(itemId)) { return res.status(400).json({ message: "ID de item inválido." }); }
+
+  try {
+      const request = pool.request();
+      request.input("id", sql.Int, itemId);
+      // Podrías verificar dependencias aquí (ej: si está en una factura no borrable) antes de eliminar
+      const result = await request.query("DELETE FROM InventoryItems WHERE ItemID = @id; SELECT @@ROWCOUNT AS RowsAffected;");
+
+      if (result.recordset[0]?.RowsAffected === 0) {
+          return res.status(404).json({ message: "Item no encontrado." });
+      }
+      res.status(200).json({ success: true, message: "Item eliminado exitosamente." }); // Usar 200 con mensaje o 204 sin mensaje
+
+  } catch (error) {
+      console.error(`Error en DELETE /api/inventory/${itemId}:`, error);
+      // Manejar errores de FK si el item no se puede borrar por estar en uso
+       if (error.number === 547) { // Código típico de error de Foreign Key constraint
+           return res.status(409).json({ message: "No se puede eliminar el item, está en uso en facturas u otras áreas." }); // 409 Conflict
+       }
+      next(error);
+  }
+});
+
 
 
 ////////////////////////////////////////////////////////////////////////

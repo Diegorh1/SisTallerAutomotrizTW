@@ -1,176 +1,407 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inventory Management - AutoCare Rodriguez</title>
+    <title>Gestión de Inventario - AutoCare Rodriguez</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* Estilos si necesitas */
+        .status-in-stock { background-color: #d1fae5; color: #065f46; }
+        .status-low-stock { background-color: #fef3c7; color: #92400e; }
+        .status-out-of-stock { background-color: #fee2e2; color: #991b1b; }
+    </style>
 </head>
 <body class="bg-gray-50">
     <nav class="bg-gray-800 text-white px-6 py-4">
         <div class="flex items-center justify-between">
             <h1 class="text-2xl font-bold">AutoCare Rodriguez</h1>
             <div class="flex space-x-4">
-                <a href="index.html">
-                    <button class="px-4 py-2 rounded hover:bg-gray-700">Clients</button>
-                </a>                  
-                <a href="/html/2Dates.html"><button class="px-4 py-2 rounded hover:bg-gray-700">Appointments</button></a>
-                <a href="/html/3.1SegService.html"><button class="px-4 py-2 rounded hover:bg-gray-700">SegService</button></a>
-                <a href="/html/4Inventory.html"><button class="px-4 py-2 rounded hover:bg-gray-700">Inventory</button></a>
-                <a href="/html/5Billing.html"><button class="px-4 py-2 rounded hover:bg-gray-700">Billing</button></a>
-                <a href="/html/7Users.html">
-                    <button class="px-4 py-2 rounded hover:bg-gray-700">Users</button>
-                </a>
-
-            </div>
-        </div>
-    </nav>
-    
-    <nav class="bg-gray-800 text-white px-6 py-4">
-        <div class="flex items-center justify-between">
-            
-            <div class="flex items-center space-x-4">
-                <select id="roleSwitch" class="bg-gray-700 px-4 py-2 rounded">
-                    <option value="admin">Admin View</option>
-                    <option value="mechanic">Mechanic View</option>
-                </select>
+                
+                <a href="index.html"><button class="px-4 py-2 rounded hover:bg-gray-700">Clientes</button></a>
+                <a href="admin_appointments.html"><button class="px-4 py-2 rounded hover:bg-gray-700">Citas</button></a>
+                <a href="admin_segservice.html"><button class="px-4 py-2 rounded hover:bg-gray-700">SegService</button></a>
+                <a href="inventory.html"><button class="px-4 py-2 rounded bg-gray-700">Inventario</button></a> 
+                <a href="admin_billing.html"><button class="px-4 py-2 rounded hover:bg-gray-700">Facturación</button></a>
+                <a href="admin_users.html"><button class="px-4 py-2 rounded hover:bg-gray-700">Usuarios</button></a>
             </div>
         </div>
     </nav>
 
     <div class="container mx-auto px-4 py-6">
-        <div class="flex space-x-4 mb-6">
-            <input type="text" placeholder="Search parts..." class="flex-1 px-4 py-2 border rounded-lg">
-            <select class="px-4 py-2 border rounded-lg">
-                <option>All Categories</option>
-                <option>Engine</option>
-                <option>Brakes</option>
-                <option>Tires</option>
-            </select>
-            <button class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">Search</button>
-        </div>
-
         <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div class="bg-white rounded-lg shadow p-6">
-                <h3 class="text-lg font-semibold mb-2">Total Parts</h3>
-                <p class="text-3xl font-bold text-blue-600">1,234</p>
-            </div>
-            <div class="bg-white rounded-lg shadow p-6">
-                <h3 class="text-lg font-semibold mb-2">Low Stock Items</h3>
-                <p class="text-3xl font-bold text-yellow-600">45</p>
-            </div>
-            <div class="bg-white rounded-lg shadow p-6">
-                <h3 class="text-lg font-semibold mb-2">Out of Stock</h3>
-                <p class="text-3xl font-bold text-red-600">12</p>
-            </div>
-            <div class="bg-white rounded-lg shadow p-6">
-                <h3 class="text-lg font-semibold mb-2">Value</h3>
-                <p class="text-3xl font-bold text-green-600">$45,678</p>
-            </div>
+            <div class="bg-white rounded-lg shadow p-6"> <h3 class="text-lg font-semibold mb-2">Total Items</h3> <p id="total-items" class="text-3xl font-bold text-blue-600">--</p> </div>
+            <div class="bg-white rounded-lg shadow p-6"> <h3 class="text-lg font-semibold mb-2">Stock Bajo</h3> <p id="low-stock-items" class="text-3xl font-bold text-yellow-600">--</p> </div>
+            <div class="bg-white rounded-lg shadow p-6"> <h3 class="text-lg font-semibold mb-2">Sin Stock</h3> <p id="out-of-stock-items" class="text-3xl font-bold text-red-600">--</p> </div>
+            <div class="bg-white rounded-lg shadow p-6"> <h3 class="text-lg font-semibold mb-2">Valor Aprox.</h3> <p id="inventory-value" class="text-3xl font-bold text-green-600">$ --</p> </div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div class="lg:col-span-2 bg-white rounded-lg shadow">
-                <div class="p-6">
-                    <div class="flex justify-between items-center mb-4">
-                        <h2 class="text-2xl font-semibold">Inventory List</h2>
-                        <button onclick="showAddPartModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Add New Part</button>
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full">
-                            <thead class="bg-gray-50">
-                                <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Part Name</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-gray-200">
-                                <tr class="hover:bg-gray-50">
-                                    <td class="px-6 py-4">Oil Filter</td>
-                                    <td class="px-6 py-4">Engine</td>
-                                    <td class="px-6 py-4">45</td>
-                                    <td class="px-6 py-4">
-                                        <span class="px-2 py-1 bg-green-100 text-green-800 rounded-full">In Stock</span>
-                                    </td>
-                                    <td class="px-6 py-4">
-                                        <button class="text-blue-600 hover:text-blue-800">Update</button>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
+        <div class="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-4 mb-6">
+            <input type="text" id="inventory-search" placeholder="Buscar por nombre o SKU..." class="flex-1 px-4 py-2 border rounded-lg">
+            <select id="inventory-category-filter" class="px-4 py-2 border rounded-lg">
+                <option value="">Todas las Categorías</option>
+               
+                <option value="Motor">Motor</option>
+                <option value="Frenos">Frenos</option>
+                <option value="Llantas">Llantas</option>
+                <option value="Aceites y Fluidos">Aceites y Fluidos</option>
+                <option value="Filtros">Filtros</option>
+                <option value="Otros">Otros</option>
+            </select>
+            <button id="filter-inventory-btn" class="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-700">Filtrar</button>
+            <button id="open-add-part-modal-btn" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">Añadir Item</button>
+        </div>
 
-            <div class="space-y-6">
-                <div class="bg-white rounded-lg shadow p-6">
-                    <h2 class="text-xl font-semibold mb-4">Quick Actions</h2>
-                    <div class="space-y-4">
-                        <button onclick="showRequestPartModal()" class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Request Part</button>
-                        <button onclick="showReportIssueModal()" class="w-full bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700">Report Issue</button>
-                    </div>
-                </div>
+         <div id="api-error-message" class="mb-4 p-3 text-red-700 bg-red-100 border border-red-400 rounded hidden"></div>
 
-                <div class="bg-white rounded-lg shadow p-6">
-                    <h2 class="text-xl font-semibold mb-4">Recent Activities</h2>
-                    <div class="space-y-4">
-                        <div class="border-l-4 border-blue-600 pl-4">
-                            <p class="font-medium">New Stock Added</p>
-                            <p class="text-sm text-gray-600">Brake Pads x20</p>
-                            <p class="text-xs text-gray-400">2 hours ago</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
+        <div class="bg-white rounded-lg shadow overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nombre</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">SKU</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Categoría</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Stock</th>
+                        <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Estado</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="inventory-table-body" class="divide-y divide-gray-200">
+                    <tr id="loading-inventory-row"><td colspan="6" class="text-center py-4 text-gray-500">Cargando inventario...</td></tr>
+                   
+                </tbody>
+            </table>
+            <div id="no-inventory-items" class="text-center py-4 text-gray-500 hidden">No se encontraron items en el inventario.</div>
         </div>
     </div>
 
-    <div id="addPartModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-        <div class="bg-white rounded-lg p-8 max-w-md w-full">
-            <h3 class="text-xl font-semibold mb-4">Add New Part</h3>
-            <form class="space-y-4">
+    <div id="partModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+        <div class="bg-white rounded-lg p-8 max-w-lg w-full m-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h3 id="part-modal-title" class="text-xl font-semibold">Añadir Nuevo Item</h3>
+                 <button id="close-part-modal-btn" type="button" class="text-gray-400 hover:text-gray-600">&times;</button>
+            </div>
+            <form id="part-form" class="space-y-4">
+                <input type="hidden" id="part-id" name="itemId"> 
                 <div>
-                    <label class="block text-sm font-medium mb-2">Part Name</label>
-                    <input type="text" class="w-full px-4 py-2 border rounded-lg">
+                    <label for="part-name" class="block text-sm font-medium mb-1">Nombre del Item</label>
+                    <input type="text" id="part-name" name="name" required class="w-full px-4 py-2 border rounded-lg">
                 </div>
-                <div>
-                    <label class="block text-sm font-medium mb-2">Category</label>
-                    <select class="w-full px-4 py-2 border rounded-lg">
-                        <option>Engine</option>
-                        <option>Brakes</option>
-                        <option>Tires</option>
-                    </select>
+                <div class="grid grid-cols-2 gap-4">
+                     <div>
+                         <label for="part-sku" class="block text-sm font-medium mb-1">SKU / Referencia</label>
+                         <input type="text" id="part-sku" name="sku" class="w-full px-4 py-2 border rounded-lg">
+                     </div>
+                     <div>
+                         <label for="part-category" class="block text-sm font-medium mb-1">Categoría</label>
+                         <select id="part-category" name="category" class="w-full px-4 py-2 border rounded-lg">
+                             <option value="">Sin Categoría</option>
+                             <option value="Motor">Motor</option>
+                             <option value="Frenos">Frenos</option>
+                             <option value="Llantas">Llantas</option>
+                             <option value="Aceites y Fluidos">Aceites y Fluidos</option>
+                             <option value="Filtros">Filtros</option>
+                             <option value="Otros">Otros</option>
+                             {/* Idealmente cargar desde API */}
+                         </select>
+                     </div>
                 </div>
-                <div>
-                    <label class="block text-sm font-medium mb-2">Quantity</label>
-                    <input type="number" class="w-full px-4 py-2 border rounded-lg">
-                </div>
-                <div class="flex justify-end space-x-4">
-                    <button type="button" onclick="hideAddPartModal()" class="px-4 py-2 border rounded-lg hover:bg-gray-100">Cancel</button>
-                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Add Part</button>
+                 <div class="grid grid-cols-2 gap-4">
+                     <div>
+                         <label for="part-quantity" class="block text-sm font-medium mb-1">Cantidad en Stock</label>
+                         <input type="number" id="part-quantity" name="stockQuantity" required min="0" value="0" class="w-full px-4 py-2 border rounded-lg">
+                     </div>
+                     <div>
+                         <label for="part-threshold" class="block text-sm font-medium mb-1">Umbral Stock Bajo</label>
+                         <input type="number" id="part-threshold" name="lowStockThreshold" min="0" placeholder="Ej: 5" class="w-full px-4 py-2 border rounded-lg">
+                     </div>
+                 </div>
+                 
+                 <div class="grid grid-cols-2 gap-4">
+                     <div>
+                         <label for="part-price" class="block text-sm font-medium mb-1">Precio Unitario (Opc)</label>
+                         <input type="number" id="part-price" name="unitPrice" step="0.01" min="0" placeholder="0.00" class="w-full px-4 py-2 border rounded-lg">
+                     </div>
+                     <div>
+                         <label for="part-supplier" class="block text-sm font-medium mb-1">Proveedor (Opc)</label>
+                         <input type="text" id="part-supplier" name="supplier" class="w-full px-4 py-2 border rounded-lg">
+                     </div>
+                 </div>
+
+                <div id="part-form-feedback" class="text-red-600 text-sm mt-2"></div>
+                <div class="flex justify-end space-x-4 pt-4 border-t">
+                    <button type="button" id="cancel-part-btn" class="px-4 py-2 border rounded-lg hover:bg-gray-100">Cancelar</button>
+                    <button type="submit" id="submit-part-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Guardar Item</button>
                 </div>
             </form>
         </div>
     </div>
 
-    <script>
-        function showAddPartModal() {
-            document.getElementById('addPartModal').classList.remove('hidden');
-        }
-
-        function hideAddPartModal() {
-            document.getElementById('addPartModal').classList.add('hidden');
-        }
-    </script>
-
     <footer class="bg-gray-800 text-white py-6 px-6 mt-8">
         <div class="container mx-auto text-center">
-            <p>&copy; 2024 AutoCare Pro. All rights reserved.</p>
+            <p>&copy; <span id="current-year-inventory"></span> AutoCare Rodriguez. All rights reserved.</p>
         </div>
     </footer>
+
+    <script>
+        // --- Funciones básicas para Modales ---
+        function showModal(modalId) { document.getElementById(modalId)?.classList.remove('hidden'); }
+        function hideModal(modalId) { document.getElementById(modalId)?.classList.add('hidden'); }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- Configuración y Elementos ---
+            const API_BASE_URL = 'http://localhost:3000'; // Ajusta si es necesario
+            const inventoryTableBody = document.getElementById('inventory-table-body');
+            const loadingRow = document.getElementById('loading-inventory-row');
+            const noItemsDiv = document.getElementById('no-inventory-items');
+            const apiErrorMessageDiv = document.getElementById('api-error-message');
+            // Resumen
+            const totalSpan = document.getElementById('total-items');
+            const lowStockSpan = document.getElementById('low-stock-items');
+            const outOfStockSpan = document.getElementById('out-of-stock-items');
+            const valueSpan = document.getElementById('inventory-value');
+            // Filtros
+            const searchInput = document.getElementById('inventory-search');
+            const categoryFilter = document.getElementById('inventory-category-filter');
+            const filterBtn = document.getElementById('filter-inventory-btn');
+            // Modal Add/Edit Part
+            const partModal = document.getElementById('partModal');
+            const openAddPartBtn = document.getElementById('open-add-part-modal-btn');
+            const closePartModalBtn = document.getElementById('close-part-modal-btn');
+            const cancelPartBtn = document.getElementById('cancel-part-btn');
+            const partForm = document.getElementById('part-form');
+            const partModalTitle = document.getElementById('part-modal-title');
+            const partIdInput = document.getElementById('part-id');
+            const partFormFeedback = document.getElementById('part-form-feedback');
+            const submitPartBtn = document.getElementById('submit-part-btn');
+
+            // --- Funciones Auxiliares ---
+            function showApiError(message, element = apiErrorMessageDiv) {
+                if (!element) return;
+                element.textContent = `Error: ${message}`;
+                element.classList.remove('hidden');
+                setTimeout(() => hideApiError(element), 6000);
+            }
+            function hideApiError(element = apiErrorMessageDiv) {
+                if (!element) return;
+                element.classList.add('hidden');
+                element.textContent = '';
+            }
+            async function apiFetch(endpoint, options = {}) {
+                options.headers = { 'Content-Type': 'application/json', ...options.headers };
+                hideApiError(); // Ocultar error global anterior
+                if (options.feedbackDiv) hideApiError(options.feedbackDiv); // Ocultar específico anterior
+
+                try {
+                    const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
+                    if (!response.ok) {
+                        let errorData = { message: `Error ${response.status}` }; // Mensaje default
+                        try {
+                            // Intenta parsear JSON, si falla usa el texto de estado
+                            const jsonError = await response.json();
+                            errorData.message = jsonError.message || `Error ${response.status}: ${response.statusText}`;
+                        } catch (e) {
+                             errorData.message = `Error ${response.status}: ${response.statusText}`;
+                        }
+                        throw new Error(errorData.message);
+                    }
+                    // Manejar respuestas sin contenido (ej: DELETE exitoso)
+                    return response.status === 204 ? null : await response.json();
+                } catch (error) {
+                    console.error('API Fetch Error:', endpoint, error);
+                    // Mostrar error en el div específico o en el global si no se suprime
+                    const targetDiv = options.feedbackDiv || (options.suppressGlobalError ? null : apiErrorMessageDiv);
+                    if (targetDiv) showApiError(error.message || 'Error de conexión.', targetDiv);
+                    throw error; // Propagar para detener ejecución si es necesario
+                }
+            }
+            function formatCurrency(amount) {
+                 return `$${(amount != null && !isNaN(amount) ? Number(amount) : 0).toFixed(2)}`;
+            }
+
+            // --- Lógica de Carga y Renderizado ---
+            async function loadInventorySummary() {
+                totalSpan.textContent = '...'; lowStockSpan.textContent = '...'; outOfStockSpan.textContent = '...'; valueSpan.textContent = '$ ...';
+                try {
+                    // Llamada REAL a la API de resumen
+                    const summary = await apiFetch('/api/inventory/summary');
+                    totalSpan.textContent = summary.total || 0;
+                    lowStockSpan.textContent = summary.low || 0;
+                    outOfStockSpan.textContent = summary.out || 0;
+                    valueSpan.textContent = formatCurrency(summary.value);
+                } catch (error) {
+                     totalSpan.textContent = 'Err'; lowStockSpan.textContent = 'Err'; outOfStockSpan.textContent = 'Err'; valueSpan.textContent = 'Error';
+                     // El error global ya se muestra
+                }
+            }
+
+            async function loadInventoryItems() {
+                loadingRow.style.display = ''; noItemsDiv.classList.add('hidden');
+                inventoryTableBody.innerHTML = ''; inventoryTableBody.appendChild(loadingRow);
+                hideApiError();
+                try {
+                    const params = new URLSearchParams();
+                    const searchTerm = searchInput.value.trim();
+                    const category = categoryFilter.value;
+                    if (searchTerm) params.append('search', searchTerm);
+                    if (category) params.append('category', category);
+
+                    // Llamada REAL a la API de inventario
+                    const items = await apiFetch(`/api/inventory?${params.toString()}`);
+
+                    loadingRow.style.display = 'none';
+                    if (items && items.length > 0) {
+                        inventoryTableBody.innerHTML = '';
+                        items.forEach(renderInventoryItemRow);
+                    } else {
+                        inventoryTableBody.innerHTML = '';
+                        noItemsDiv.classList.remove('hidden');
+                    }
+                } catch (error) {
+                     loadingRow.style.display = 'none';
+                     inventoryTableBody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-red-500">Error al cargar inventario.</td></tr>`;
+                     // El error global ya se muestra
+                }
+            }
+
+            function renderInventoryItemRow(item) {
+                let statusText = 'En Stock'; let statusClass = 'status-in-stock';
+                const stock = item.StockQuantity ?? 0; // Usar ?? para default a 0 si es null/undefined
+                const threshold = item.LowStockThreshold;
+
+                if (stock <= 0) { statusText = 'Sin Stock'; statusClass = 'status-out-of-stock'; }
+                else if (threshold != null && stock <= threshold) { statusText = 'Stock Bajo'; statusClass = 'status-low-stock'; }
+
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50';
+                row.dataset.itemId = item.ItemID; // Guardar ID
+
+                // Usar textContent para seguridad contra XSS
+                const nameCell = document.createElement('td'); nameCell.className = 'px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900'; nameCell.textContent = item.Name || 'N/A';
+                const skuCell = document.createElement('td'); skuCell.className = 'px-6 py-4 whitespace-nowrap text-sm text-gray-500'; skuCell.textContent = item.SKU || '-';
+                const categoryCell = document.createElement('td'); categoryCell.className = 'px-6 py-4 whitespace-nowrap text-sm text-gray-500'; categoryCell.textContent = item.Category || '-';
+                const stockCell = document.createElement('td'); stockCell.className = 'px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-right'; stockCell.textContent = stock;
+                const statusCell = document.createElement('td'); statusCell.className = 'px-6 py-4 whitespace-nowrap text-center'; statusCell.innerHTML = `<span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}">${statusText}</span>`; // innerHTML seguro para span simple
+                const actionsCell = document.createElement('td'); actionsCell.className = 'px-6 py-4 whitespace-nowrap text-sm font-medium'; actionsCell.innerHTML = `<button class="text-indigo-600 hover:text-indigo-800 mr-3 edit-item-btn">Editar</button><button class="text-red-600 hover:text-red-800 delete-item-btn">Eliminar</button>`;
+
+                row.appendChild(nameCell); row.appendChild(skuCell); row.appendChild(categoryCell); row.appendChild(stockCell); row.appendChild(statusCell); row.appendChild(actionsCell);
+                inventoryTableBody.appendChild(row);
+            }
+
+            // --- Lógica Modales ---
+            openAddPartBtn?.addEventListener('click', () => {
+                partForm.reset(); partIdInput.value = ''; partModalTitle.textContent = 'Añadir Nuevo Item';
+                submitPartBtn.textContent = 'Añadir Item'; hideApiError(partFormFeedback); showModal('partModal');
+            });
+            closePartModalBtn?.addEventListener('click', () => hideModal('partModal'));
+            cancelPartBtn?.addEventListener('click', () => hideModal('partModal'));
+
+            // Enviar Formulario Añadir/Editar Item
+            partForm?.addEventListener('submit', async (e) => {
+                e.preventDefault(); hideApiError(partFormFeedback); // Limpiar error modal
+                const itemId = partIdInput.value; const isEditMode = !!itemId;
+                const formData = new FormData(partForm);
+                const data = {
+                    name: formData.get('name')?.trim(), // Quitar espacios extra
+                    sku: formData.get('sku')?.trim() || null,
+                    category: formData.get('category') || null,
+                    stockQuantity: parseInt(formData.get('stockQuantity') || '0'),
+                    lowStockThreshold: formData.get('lowStockThreshold') ? parseInt(formData.get('lowStockThreshold')) : null,
+                    unitPrice: formData.get('unitPrice') ? parseFloat(formData.get('unitPrice')) : null,
+                    supplier: formData.get('supplier')?.trim() || null,
+                };
+
+                // Validaciones
+                let errors = [];
+                if (!data.name) errors.push("Nombre es requerido.");
+                if (isNaN(data.stockQuantity) || data.stockQuantity < 0) errors.push("Cantidad >= 0.");
+                if (data.lowStockThreshold !== null && (isNaN(data.lowStockThreshold) || data.lowStockThreshold < 0)) errors.push("Umbral >= 0.");
+                if (data.unitPrice !== null && (isNaN(data.unitPrice) || data.unitPrice < 0)) errors.push("Precio >= 0.");
+                if (errors.length > 0) { showApiError(errors.join(' '), partFormFeedback); return; }
+
+                const endpoint = isEditMode ? `/api/inventory/${itemId}` : '/api/inventory';
+                const method = isEditMode ? 'PUT' : 'POST';
+
+                console.log(`Enviando a ${method} ${endpoint}:`, data);
+                submitPartBtn.disabled = true; submitPartBtn.textContent = 'Guardando...'; submitPartBtn.classList.add('saving-indicator');
+
+                try {
+                    // Llamada REAL a la API
+                    const result = await apiFetch(endpoint, { method, body: JSON.stringify(data), feedbackDiv: partFormFeedback });
+                    console.log("Resultado API:", result);
+
+                    hideModal('partModal');
+                    alert(`Item ${isEditMode ? 'actualizado' : 'añadido'} con éxito.`);
+                    loadInventoryItems(); loadInventorySummary(); // Recargar datos
+                } catch(error) { /* Error ya mostrado por apiFetch */ }
+                finally { submitPartBtn.disabled = false; submitPartBtn.textContent = 'Guardar Item'; submitPartBtn.classList.remove('saving-indicator'); }
+            });
+
+            // --- Lógica Acciones Tabla ---
+            inventoryTableBody.addEventListener('click', async (e) => {
+                const target = e.target; const row = target.closest('tr');
+                if (!row || !row.dataset.itemId) return;
+                const itemId = row.dataset.itemId;
+                const itemName = row.cells[0].textContent; // Para mensajes
+
+                // Botón Editar
+                if (target.classList.contains('edit-item-btn')) {
+                     console.log(`Editar item ID: ${itemId}`);
+                     hideApiError(partFormFeedback); // Limpiar error modal
+                     partModalTitle.textContent = 'Cargando...'; submitPartBtn.textContent = 'Actualizar Item'; showModal('partModal');
+                     try {
+                        // Llamada REAL a API para obtener datos completos
+                        const itemData = await apiFetch(`/api/inventory/${itemId}`, { suppressGlobalError: true }); // Evitar error global si 404
+                        if (!itemData) throw new Error("Item no encontrado en API.");
+
+                        console.log("Datos para editar:", itemData);
+                        partForm.reset();
+                        partIdInput.value = itemData.ItemID;
+                        document.getElementById('part-name').value = itemData.Name || '';
+                        document.getElementById('part-sku').value = itemData.SKU || '';
+                        document.getElementById('part-category').value = itemData.Category || '';
+                        document.getElementById('part-quantity').value = itemData.StockQuantity ?? 0; // Usar ?? para 0
+                        document.getElementById('part-threshold').value = itemData.LowStockThreshold ?? ''; // Usar ?? para '' si es null/undefined
+                        document.getElementById('part-price').value = itemData.UnitPrice ?? '';
+                        document.getElementById('part-supplier').value = itemData.Supplier || '';
+                        partModalTitle.textContent = 'Editar Item'; // Título final
+
+                     } catch (error) {
+                         alert(`Error al cargar datos para editar: ${error.message}`);
+                         hideModal('partModal'); // Ocultar modal si falla la carga
+                     }
+
+                // Botón Eliminar
+                } else if (target.classList.contains('delete-item-btn')) {
+                    if (confirm(`¿Está seguro que desea eliminar "${itemName}" (ID ${itemId})?`)) {
+                         target.disabled = true; target.textContent = 'Eliminando...'; hideApiError();
+                         try {
+                             // Llamada REAL a la API
+                             await apiFetch(`/api/inventory/${itemId}`, { method: 'DELETE', suppressGlobalError: true });
+                             console.log(`Item ${itemId} eliminado.`);
+                             alert(`Item "${itemName}" eliminado.`);
+                             loadInventoryItems(); loadInventorySummary(); // Recargar
+                         } catch (error) {
+                             alert(`Error al eliminar: ${error.message}`);
+                             target.disabled = false; target.textContent = 'Eliminar'; // Rehabilitar en caso de error
+                         }
+                    }
+                }
+            });
+
+             // --- Lógica Filtros ---
+             filterBtn?.addEventListener('click', loadInventoryItems);
+             searchInput?.addEventListener('keypress', (e) => { if(e.key === 'Enter') loadInventoryItems(); });
+             categoryFilter?.addEventListener('change', loadInventoryItems);
+
+            // --- Inicialización ---
+            document.getElementById('current-year-inventory').textContent = new Date().getFullYear();
+            loadInventorySummary();
+            loadInventoryItems();
+            // Añadir fila inicial al modal
+            if(itemsContainer && itemsContainer.children.length === 0) { addInvoiceItemRow(); }
+
+        }); // Fin DOMContentLoaded
+    </script>
 </body>
 </html>
